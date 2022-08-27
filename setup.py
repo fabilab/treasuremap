@@ -462,7 +462,7 @@ class BuildConfiguration:
                 ext = first(
                     extension
                     for extension in self.extensions
-                    if extension.name == "treasuremap"
+                    if extension.name == "_treasuremap"
                 )
                 buildcfg.configure(ext)
 
@@ -783,7 +783,7 @@ class BuildConfiguration:
 # Import version number from version.py so we only need to change it in
 # one place when a new release is created
 __version__: str = ""
-exec(open("src/version.py").read())
+exec(open("src/treasuremap/version.py").read())
 
 # Process command line options
 buildcfg = BuildConfiguration()
@@ -791,8 +791,8 @@ buildcfg.process_args_from_command_line()
 
 # Define the extension
 sources = [
-    "src/main.cpp",
-    "src/treasuremap.c",
+    "src/_treasuremap/main.cpp",
+    "src/_treasuremap/treasuremap.c",
 ]
 #sources.append(os.path.join("src", "_igraph", "force_cpp_linker.cpp"))
 
@@ -807,7 +807,7 @@ headers = ["src/_igraph/igraphmodule_api.h"] if not SKIP_HEADER_INSTALL else []
 #   Sort input source files if you glob sources to ensure bit-for-bit
 #   reproducible builds (https://github.com/pybind/python_example/pull/53)
 treasuremap_extension = Pybind11Extension(
-    "treasuremap",
+    "_treasuremap",
     sources,
     # Example: passing in the version to the compiled code
     define_macros=[('VERSION_INFO', __version__)],
@@ -836,7 +836,9 @@ options = dict(
         # See: https://github.com/igraph/python-igraph/issues/464
         "": "src"
     },
-    packages=find_packages(where="src"),
+    packages=find_packages(
+        where="src",
+    ),
     install_requires=["texttable>=1.6.2"],
     extras_require={
         "matplotlib": ["matplotlib>=3.3.0; platform_python_implementation != 'PyPy'"],
