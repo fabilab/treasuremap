@@ -31,7 +31,7 @@
  * distances */
 
 /* Find sigma for this vertex by binary search */
-static int igraph_i_umap_find_sigma(const igraph_vector_t *distances,
+static igraph_error_t igraph_i_umap_find_sigma(const igraph_vector_t *distances,
         const igraph_vector_int_t *eids,
         igraph_real_t rho, igraph_real_t *sigma_p, igraph_real_t target) {
 
@@ -89,7 +89,7 @@ static int igraph_i_umap_find_sigma(const igraph_vector_t *distances,
 
 /* Convert the graph with distances into a probability graph with exponential decay */
 /* NOTE: this is funny because the distance was a correlation to start with... ?? */
-static int igraph_i_umap_find_prob_graph(const igraph_t *graph,
+static igraph_error_t igraph_i_umap_find_prob_graph(const igraph_t *graph,
         const igraph_vector_t *distances, igraph_vector_t *umap_weights) {
 
     igraph_integer_t no_of_nodes = igraph_vcount(graph);
@@ -189,7 +189,7 @@ static int igraph_i_umap_find_prob_graph(const igraph_t *graph,
 }
 
 /* Helper function to compute a and b parameters (smoothing probability metric in embedding space) */
-static int igraph_i_umap_get_ab_residuals(igraph_vector_t *residuals,
+static igraph_error_t igraph_i_umap_get_ab_residuals(igraph_vector_t *residuals,
         igraph_real_t *squared_sum_res, igraph_integer_t nr_points, igraph_real_t a,
         igraph_real_t b, igraph_vector_t *powb, const igraph_vector_t *x, igraph_real_t min_dist)
 {
@@ -267,7 +267,7 @@ static int igraph_i_umap_get_ab_residuals(igraph_vector_t *residuals,
  * For instance, if b = 1, a -> 0.01*a moves the fit a decade towards larger min_dist,
  * and a -> 100*a moves the fit a decade towards smaller min_dist.
  * */
-static int igraph_i_umap_fit_ab(igraph_real_t min_dist, igraph_real_t *a_p, igraph_real_t *b_p)
+static igraph_error_t igraph_i_umap_fit_ab(igraph_real_t min_dist, igraph_real_t *a_p, igraph_real_t *b_p)
 {
     /* Grid points */
     igraph_vector_t x;
@@ -408,7 +408,7 @@ static int igraph_i_umap_fit_ab(igraph_real_t min_dist, igraph_real_t *a_p, igra
 
             /* Compare and if we are going back uphill, undo last step and break */
 #ifdef UMAP_DEBUG
-            printf("during line search, k = %d, old SSR:, %g, new SSR (half a,b):, %g\n", k,
+            printf("during line search, k = %ld, old SSR:, %g, new SSR (half a,b):, %g\n", k,
                     squared_sum_res_tmp, squared_sum_res);
 #endif
             if (squared_sum_res > squared_sum_res_tmp - tol) {
@@ -449,7 +449,7 @@ static int igraph_i_umap_fit_ab(igraph_real_t min_dist, igraph_real_t *a_p, igra
 
 /* cross-entropy */
 #ifdef UMAP_DEBUG
-static int igraph_i_umap_compute_cross_entropy(const igraph_t *graph,
+static igraph_error_t igraph_i_umap_compute_cross_entropy(const igraph_t *graph,
        const igraph_vector_t *umap_weights, const igraph_matrix_t *layout, igraph_real_t a, igraph_real_t b,
        igraph_real_t *cross_entropy) {
 
@@ -522,7 +522,7 @@ static int igraph_i_umap_compute_cross_entropy(const igraph_t *graph,
 
 
 /* clip forces to avoid too rapid shifts */
-static int igraph_i_umap_clip_force(igraph_real_t *force, igraph_real_t limit) {
+static igraph_error_t igraph_i_umap_clip_force(igraph_real_t *force, igraph_real_t limit) {
 
     *force  = fmax(fmin(*force, limit), -limit);
 
@@ -533,7 +533,7 @@ static int igraph_i_umap_clip_force(igraph_real_t *force, igraph_real_t limit) {
 /* NOTE: mu is the probability of a true edge in high dimensions, not affected
  * by the embedding (in particular, xd and yd), so it's a constant for the
  * derivative/force. Same applies for the repulsion */
-static int igraph_i_umap_attract(
+static igraph_error_t igraph_i_umap_attract(
         igraph_vector_t *delta, igraph_real_t mu,
         igraph_real_t a, igraph_real_t b, igraph_vector_t *forces)
 {
@@ -553,7 +553,7 @@ static int igraph_i_umap_attract(
         igraph_i_umap_clip_force(&(VECTOR(*forces)[d]), 3);
 
 #ifdef UMAP_DEBUG
-        printf("force attractive: delta[%d] = %g, forces[%d] = %g\n", d, VECTOR(*delta)[d], d, VECTOR(*forces)[d]);
+        printf("force attractive: delta[%ld] = %g, forces[%ld] = %g\n", d, VECTOR(*delta)[d], d, VECTOR(*forces)[d]);
 #endif
     }
 
@@ -561,7 +561,7 @@ static int igraph_i_umap_attract(
 }
 
 /*xd is difference in x direction, mu is a weight */
-static int igraph_i_umap_repel(
+static igraph_error_t igraph_i_umap_repel(
         igraph_vector_t *delta, igraph_real_t mu,
         igraph_real_t a, igraph_real_t b, igraph_vector_t *forces)
 {
@@ -585,14 +585,14 @@ static int igraph_i_umap_repel(
         igraph_i_umap_clip_force(&(VECTOR(*forces)[d]), 3);
 
 #ifdef UMAP_DEBUG
-        printf("force repulsive: delta[%d] = %g, forces[%d] = %g\n", d, VECTOR(*delta)[d], d, VECTOR(*forces)[d]);
+        printf("force repulsive: delta[%ld] = %g, forces[%ld] = %g\n", d, VECTOR(*delta)[d], d, VECTOR(*forces)[d]);
 #endif
     }
 
     return IGRAPH_SUCCESS;
 }
 
-static int igraph_i_umap_apply_forces(
+static igraph_error_t igraph_i_umap_apply_forces(
         const igraph_t *graph,  const igraph_vector_t *umap_weights,
         igraph_matrix_t *layout, igraph_real_t a, igraph_real_t b, igraph_real_t prob,
         igraph_real_t learning_rate, igraph_bool_t avoid_neighbor_repulsion,
@@ -727,7 +727,7 @@ static int igraph_i_umap_apply_forces(
     return IGRAPH_SUCCESS;
 }
 
-static int igraph_i_umap_optimize_layout_stochastic_gradient(const igraph_t *graph,
+static igraph_error_t igraph_i_umap_optimize_layout_stochastic_gradient(const igraph_t *graph,
        const igraph_vector_t *umap_weights, igraph_real_t a, igraph_real_t b,
        igraph_matrix_t *layout, igraph_integer_t epochs, igraph_real_t sampling_prob,
        const igraph_vector_int_t *is_fixed) {
@@ -782,7 +782,7 @@ static int igraph_i_umap_optimize_layout_stochastic_gradient(const igraph_t *gra
 }
 
 /* Center layout around (0,0) at the end, just for convenience */
-static int igraph_i_umap_center_layout(igraph_matrix_t *layout) {
+static igraph_error_t igraph_i_umap_center_layout(igraph_matrix_t *layout) {
     igraph_integer_t no_of_nodes = igraph_matrix_nrow(layout);
     igraph_real_t xm = 0, ym = 0;
 
@@ -807,7 +807,7 @@ static int igraph_i_umap_center_layout(igraph_matrix_t *layout) {
 
 
 /* Check the distances argument, which should be NULL or a vector of nonnegative numbers */
-static int igraph_i_umap_check_distances(const igraph_vector_t *distances, igraph_integer_t no_of_edges) {
+static igraph_error_t igraph_i_umap_check_distances(const igraph_vector_t *distances, igraph_integer_t no_of_edges) {
 
     if (distances == NULL) {
         return IGRAPH_SUCCESS;
@@ -831,7 +831,7 @@ static int igraph_i_umap_check_distances(const igraph_vector_t *distances, igrap
 
 /* This is the main function that works for any dimensionality of the embedding
  * (currently hard-constrained to 2 or 3 ONLY in the initialization). */
-static int igraph_i_layout_treasuremap(
+static igraph_error_t igraph_layout_treasuremap(
         const igraph_t *graph,
         igraph_matrix_t *res,
         igraph_bool_t use_seed,
@@ -876,7 +876,7 @@ static int igraph_i_layout_treasuremap(
 
     if (use_seed) {
         if((igraph_matrix_nrow(res) != no_of_nodes) || (igraph_matrix_ncol(res) != ndim)) {
-          IGRAPH_ERRORF("Seed layout should have %d points in %d dimensions, got %d points in %d dimensions.",
+          IGRAPH_ERRORF("Seed layout should have %ld points in %ld dimensions, got %ld points in %ld dimensions.",
                   IGRAPH_EINVAL, no_of_nodes, ndim,
                   igraph_matrix_nrow(res),
                   igraph_matrix_ncol(res));
@@ -930,98 +930,4 @@ static int igraph_i_layout_treasuremap(
     return IGRAPH_SUCCESS;
 }
 
-/**
- * \function treasuremap
- * \brief Layout using TREASUREMAP
- *
- * TREASUREMAP is a variation on UMAP that keeps some nodes at fixed coordinates.
- *
- * </para><para>
- * References:
- *
- * </para><para>
- * Leland McInnes, John Healy, and James Melville. https://arxiv.org/abs/1802.03426
- *
- * \param graph Pointer to the similarity graph to find a layout for (i.e. to embed).
- * \param res Pointer to the n by 2 matrix where the layout coordinates will be stored.
- * \param use_seed Logical, if true the supplied values in the \p res argument are used
- *   as an initial layout, if false a random initial layout is used.
- * \param distances Pointer to a vector of edge lengths. Similarity graphs for
- *   UMAP are often originally meant in terms of similarity weights (e.g. correlation between
- *   high-dimensional vectors) and converted into distances by crude dist := 1 - corr. That is
- *   fine here too. If this argument is a NULL pointer (NULL), all lengths are assumed equal.
- * \param min_dist A fudge parameter that decides how close two unconnected vertices can be in the
- *   embedding before feeling a repulsive force. It should be positive. Typically, 0.01 is a good
- *   number.
- * \param epochs Number of iterations of the main stochastic gradient descent loop on the
- *   cross-entropy. Usually, 500 epochs can be used if the graph is the graph is small
- *   (less than 50k edges), 50 epochs are used for larger graphs.
- * \param sampling_prob The fraction of vertices moved at each iteration of the stochastic gradient
- *   descent (epoch). At fixed number of epochs, a higher fraction makes the algorithm slower.
- *   Vice versa, a too low number will converge very slowly, possibly too slowly.
- * \param is_fixed Pointer to an integer vector determining for each node if it's fixed in place or
- *   can be moved around by the algorithm. Only two values are allowed: 1 means fixed, 0 means not
- *   fixed.
- *
- * \return Error code.
- *
- * \experimental
- */
-int treasuremap_2d(const igraph_t *graph,
-                                  igraph_matrix_t *res,
-                                  igraph_bool_t use_seed,
-                                  const igraph_vector_t *distances,
-                                  igraph_real_t min_dist,
-                                  igraph_integer_t epochs,
-                                  igraph_real_t sampling_prob,
-                                  const igraph_vector_int_t *is_fixed) {
-    return igraph_i_layout_treasuremap(graph, res, use_seed,
-            distances, min_dist, epochs, sampling_prob, 2,
-            is_fixed);
-}
 
-
-/**
- * \function treasuremap_3d
- * \brief 3D layout using TREASUREMAP.
- *
- * This is the 3D version of the TREASUREMAP algorithm (see \ref
- * igraph_layout_umap() for the 2D version).
- *
- * \param graph Pointer to the similarity graph to find a layout for (i.e. to embed).
- * \param res Pointer to the n by 3 matrix where the layout coordinates will be stored.
- * \param use_seed Logical, if true the supplied values in the \p res argument are used
- *   as an initial layout, if false a random initial layout is used.
- * \param distances Pointer to a vector of edge lengths. Similarity graphs for
- *   UMAP are often originally meant in terms of similarity weights (e.g. correlation between
- *   high-dimensional vectors) and converted into distances by crude dist := 1 - corr. That is
- *   fine here too. If this argument is a NULL pointer (NULL), all lengths are assumed equal.
- * \param min_dist A fudge parameter that decides how close two unconnected vertices can be in the
- *   embedding before feeling a repulsive force. It should be positive. Typically, 0.01 is a good
- *   number.
- * \param epochs Number of iterations of the main stochastic gradient descent loop on the
- *   cross-entropy. Usually, 500 epochs can be used if the graph is the graph is small
- *   (less than 50k edges), 50 epochs are used for larger graphs.
- * \param sampling_prob The fraction of vertices moved at each iteration of the stochastic gradient
- *   descent (epoch). At fixed number of epochs, a higher fraction makes the algorithm slower.
- *   Vice versa, a too low number will converge very slowly, possibly too slowly.
- * \param is_fixed Pointer to an integer vector determining for each node if it's fixed in place or
- *   can be moved around by the algorithm. Only two values are allowed: 1 means fixed, 0 means not
- *   fixed.
- *
- * \return Error code.
- *
- * \experimental
- */
-int treasuremap_3d(const igraph_t *graph,
-                                     igraph_matrix_t *res,
-                                     igraph_bool_t use_seed,
-                                     const igraph_vector_t *distances,
-                                     igraph_real_t min_dist,
-                                     igraph_integer_t epochs,
-                                     igraph_real_t sampling_prob,
-                                     const igraph_vector_int_t *is_fixed) {
-    return igraph_i_layout_treasuremap(graph, res, use_seed,
-            distances, min_dist, epochs, sampling_prob, 3,
-            is_fixed);
-}
