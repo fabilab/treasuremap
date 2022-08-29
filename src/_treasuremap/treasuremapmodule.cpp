@@ -1,21 +1,24 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
 #include <igraph_constructors.h>
-#include "treasuremap.c"
+#include "treasuremap_layout.c"
 
 namespace py = pybind11;
 
-int layout_treasuremap(
-        py::array_t<double> res,
-        py::array_t<int> edges,
+py::array_t<double> layout_treasuremap(
+        py::array_t<double> seed,
+        py::array_t<long> edges,
         py::array_t<double> distances,
-        py::array_t<int> is_fixed,
+        py::array_t<long> is_fixed,
         double min_dist,
         double sampling_probability,
         int epochs,
         int ndim) {
     
     long nedges, nvertices;
+    py::buffer_info buf;
+    double *ptr_double;
+    long *ptr_long;
     igraph_vector_int_t igraph_edges;
     igraph_vector_t igraph_distances;
     igraph_vector_int_t igraph_is_fixed;
@@ -36,6 +39,11 @@ int layout_treasuremap(
     nedges = edges.shape(0);
     if (igraph_vector_int_init(&igraph_edges, 2 * nedges))
         throw std::runtime_error("Could not initialize edge list of graph");
+    buf = edges.request();
+    ptr_long = static_cast<long *>(buf.ptr);
+    for (long i = 0; i < buf.shape[0]; i++)
+        for (long j = 0; j < buf.shape[1]; j++)
+            VECTOR(igraph_edges)[2 * i + j] = ptr_long[2 * i + j];
 
     // distances
     if ((distances.ndim() != 1) || (distances.size() != edges.shape(0))) {
@@ -43,6 +51,10 @@ int layout_treasuremap(
     }
     if(igraph_vector_init(&igraph_distances, nedges))
         throw std::runtime_error("Could not initialize distance list");
+    buf = distances.request();
+    ptr_double = static_cast<double *>(buf.ptr);
+    for (long i = 0; i < buf.shape[0]; i++)
+        VECTOR(igraph_distances)[i] = ptr_double[i];
 
     // is_fixed
     if (is_fixed.ndim() != 1) {
@@ -51,13 +63,17 @@ int layout_treasuremap(
     nvertices = is_fixed.size();
     if (igraph_vector_int_init(&igraph_is_fixed, nvertices))
         throw std::runtime_error("Could not initialize fixed vertices list");
+    buf = is_fixed.request();
+    ptr_long = static_cast<long *>(buf.ptr);
+    for (long i = 0; i < buf.shape[0]; i++)
+        VECTOR(igraph_is_fixed)[i] = ptr_long[i];
 
     // output
-    if ((res.ndim() != 2) || (res.shape(0) != nvertices) || (res.shape(1) != ndim))
+    if ((seed.ndim() != 2) || (seed.shape(0) != nvertices) || (seed.shape(1) != ndim))
         throw std::runtime_error("res must be an N x ndim matrix of length equal to vertices");
     if (igraph_matrix_init(&igraph_res, nvertices, ndim))
         throw std::runtime_error("Could not initialize embedding matrix");
-    //
+
     // Initialize graph
     if (igraph_create(&igraph_graph, &igraph_edges, nvertices, false))
         throw std::runtime_error("Could not initialize graph");
@@ -75,21 +91,32 @@ int layout_treasuremap(
             igraph_ndim,
             &igraph_is_fixed);
 
-    // Convert output back to Python
-    // TODO
-
     // Destroy intermediate data structures
-    igraph_matrix_destroy(&igraph_res);
     igraph_destroy(&igraph_graph); // FIXME: requires more deallocation?
     igraph_vector_int_destroy(&igraph_is_fixed);
     igraph_vector_destroy(&igraph_distances);
     igraph_vector_int_destroy(&igraph_edges);
 
     if (return_code) {
-        // Raise Python exception
-        return 1;
+        igraph_matrix_destroy(&igraph_res);
+        throw std::runtime_error("Low-level C call failed");
     }
-    return 0;
+
+    // Convert output back to Python
+    auto result = py::array_t<double>(nvertices * 2);
+    buf = result.request();
+    ptr_double = static_cast<double *>(buf.ptr);
+    for (long i = 0; i < nvertices; i++)
+        for (long j = 0; j < 2; j++)
+            ptr_long[i * 2 + j] = MATRIX(igraph_res, i, j);
+    // NOTE: C++ STL takes care of destructor when going out of scope
+    std::vector<int> new_shape{(int)nvertices, 2};
+    result = result.reshape(new_shape);
+
+    // Destroy low-level object
+    igraph_matrix_destroy(&igraph_res);
+
+    return result;
 }
 
 
@@ -105,7 +132,7 @@ PYBIND11_MODULE(_treasuremap, m) {
            subtract
     )pbdoc";
 
-    m.def("fit", &layout_treasuremap, R"pbdoc(
+    m.def("_layout_treasuremap", &layout_treasuremap, R"pbdoc(
         TREASUREMAP algorithm.
     )pbdoc",
     py::arg("res"), py::arg("edges"), py::arg("distances"), py::arg("is_fixed"),

@@ -791,8 +791,8 @@ buildcfg.process_args_from_command_line()
 
 # Define the extension
 sources = [
-    "src/_treasuremap/main.cpp",
-    "src/_treasuremap/treasuremap.c",
+    "src/_treasuremap/treasuremapmodule.cpp",
+    "src/_treasuremap/treasuremap_layout.c",
 ]
 #sources.append(os.path.join("src", "_igraph", "force_cpp_linker.cpp"))
 
