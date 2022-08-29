@@ -791,7 +791,7 @@ buildcfg.process_args_from_command_line()
 
 # Define the extension
 sources = [
-    "src/_treasuremap/treasuremapmodule.cpp",
+    "src/_treasuremap/treasuremapmodule.c",
     "src/_treasuremap/treasuremap_layout.c",
 ]
 #sources.append(os.path.join("src", "_igraph", "force_cpp_linker.cpp"))
@@ -807,11 +807,9 @@ headers = []
 # Note:
 #   Sort input source files if you glob sources to ensure bit-for-bit
 #   reproducible builds (https://github.com/pybind/python_example/pull/53)
-treasuremap_extension = Pybind11Extension(
+treasuremap_extension = Extension(
     "_treasuremap",
     sources,
-    # Example: passing in the version to the compiled code
-    define_macros=[('VERSION_INFO', __version__)],
 )
 
 options = dict(

@@ -1,7 +1,7 @@
 import numpy as np
 import igraph as ig
 
-from _treasuremap import _layout_treasuremap
+import _treasuremap
 
 
 def layout_treasuremap(
@@ -15,19 +15,26 @@ def layout_treasuremap(
         dim=2,
     ):
 
-    use_seed = seed is not None
     nvertices = graph.vcount()
-    edges = graph.get_edgelist()
-    edges = np.asarray(edges)
+    nedges = graph.ecount()
+
+    if nvertices == 0:
+        return ig.Layout([])
+    if nvertices == 1:
+        return ig.Layout([[0, 0]])
+    if len(is_fixed) != nvertices:
+        raise ValueError("is_fixed must be a boolean vector of length n. vertices")
 
     if is_fixed is None:
         is_fixed = np.zeros(nvertices, int)
     elif isinstance(is_fixed, str):
         is_fixed = graph.vs[is_fixed]
-    is_fixed = np.asarray(is_fixed)
 
+    edges = graph.get_edgelist()
     if dist is None:
-        dist = np.ones(len(edges))
+        dist = [1] * nedges
+    if len(dist) != nedges:
+        raise ValueError("dist must be a vector with length n. edges")
 
     if min_dist < 0:
         raise ValueError(f"Minimum distance must be positive, got {min_dist}")
@@ -42,22 +49,17 @@ def layout_treasuremap(
         raise ValueError(f"Number of dimensions must be 2 or 3, for {dim}")
 
     # Call C function
-    result = _layout_treasuremap(
-        edges,
-        dist,
-        seed,
-        use_seed,
-        is_fixed,
-        min_dist,
-        sampling_prob,
-        epochs,
-        dim,
+    result = _treasuremap.layout_treasuremap(
+        nvertices, nedges,
+        edges, dist, seed, is_fixed,
+        min_dist, sampling_prob, epochs, dim,
     )
-    result = result.reshape((nvertices, 2))
 
-    # Recenter
-    result -= result.mean(axis=0)
+    #result = np.asarray(result).reshape((nvertices, 2))
 
-    # Make Layout
-    result = ig.Layout(list(result))
+    ## Recenter
+    #result -= result.mean(axis=0)
+
+    ## Make Layout
+    #result = ig.Layout(list(result))
     return result
