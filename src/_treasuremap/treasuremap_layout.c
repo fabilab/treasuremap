@@ -596,7 +596,7 @@ static igraph_error_t igraph_i_umap_apply_forces(
         const igraph_t *graph,  const igraph_vector_t *umap_weights,
         igraph_matrix_t *layout, igraph_real_t a, igraph_real_t b, igraph_real_t prob,
         igraph_real_t learning_rate, igraph_bool_t avoid_neighbor_repulsion,
-        const igraph_vector_int_t *is_fixed)
+        const igraph_vector_bool_t *is_fixed)
 {
     igraph_integer_t no_of_nodes = igraph_matrix_nrow(layout);
     igraph_integer_t ndim = igraph_matrix_ncol(layout);
@@ -730,7 +730,7 @@ static igraph_error_t igraph_i_umap_apply_forces(
 static igraph_error_t igraph_i_umap_optimize_layout_stochastic_gradient(const igraph_t *graph,
        const igraph_vector_t *umap_weights, igraph_real_t a, igraph_real_t b,
        igraph_matrix_t *layout, igraph_integer_t epochs, igraph_real_t sampling_prob,
-       const igraph_vector_int_t *is_fixed) {
+       const igraph_vector_bool_t *is_fixed) {
 
     igraph_real_t learning_rate = 1;
 
@@ -816,7 +816,7 @@ static igraph_error_t igraph_layout_treasuremap(
         igraph_integer_t epochs,
         igraph_real_t sampling_prob,
         igraph_integer_t ndim,
-        const igraph_vector_int_t *is_fixed) {
+        const igraph_vector_bool_t *is_fixed) {
 
     igraph_integer_t no_of_edges = igraph_ecount(graph);
     igraph_integer_t no_of_nodes = igraph_vcount(graph);

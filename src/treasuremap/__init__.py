@@ -22,13 +22,11 @@ def layout_treasuremap(
         return ig.Layout([])
     if nvertices == 1:
         return ig.Layout([[0, 0]])
-    if len(is_fixed) != nvertices:
-        raise ValueError("is_fixed must be a boolean vector of length n. vertices")
 
     if is_fixed is None:
-        is_fixed = np.zeros(nvertices, int)
-    elif isinstance(is_fixed, str):
-        is_fixed = graph.vs[is_fixed]
+        is_fixed = [False] * nvertices
+    if len(is_fixed) != nvertices:
+        raise ValueError("is_fixed must be a boolean vector of length n. vertices")
 
     edges = graph.get_edgelist()
     if dist is None:

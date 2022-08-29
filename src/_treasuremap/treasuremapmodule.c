@@ -1,7 +1,9 @@
 #include <Python.h>
 #include <igraph_constructors.h>
 #include <igraph_version.h>
-#include "treasuremap_layout.c"
+
+//#include "treasuremap_layout.c"
+//#include "convert.c"
 
 
 static PyObject* treasuremapmodule_treasuremap(PyObject *self, PyObject *args, PyObject * kwds) {
@@ -11,10 +13,11 @@ static PyObject* treasuremapmodule_treasuremap(PyObject *self, PyObject *args, P
     PyObject *edges_o, *dist_o, *seed_o = Py_None, *is_fixed_o;
     double min_dist, sampling_probability;
     long epochs, ndim;
+    bool use_seed = false;
 
     igraph_vector_int_t igraph_edges;
     igraph_vector_t igraph_distances;
-    igraph_vector_int_t igraph_is_fixed;
+    igraph_vector_bool_t igraph_is_fixed;
     igraph_t igraph_graph;
     igraph_matrix_t igraph_res;
 
@@ -27,6 +30,31 @@ static PyObject* treasuremapmodule_treasuremap(PyObject *self, PyObject *args, P
         return NULL;
     }
 
+    if (igraphmodule_PyObject_to_vector_bool_t(is_fixed_o, &igraph_is_fixed))
+        return NULL;
+
+    if (igraphmodule_PyObject_float_to_vector_t(dist_o, &igraph_distances)) {
+        igraph_vector_bool_destroy(&igraph_is_fixed);
+        return NULL;
+    }
+
+    // With a seed, inject it into the output
+    if (seed_o != Py_None) {
+        if (igraphmodule_PyList_to_matrix_t(seed_o, &igraph_res)) {
+            igraph_vector_bool_destroy(&igraph_is_fixed);
+            igraph_vector_destroy(&igraph_dist);
+            return NULL;
+        }
+    // Otherwise, just allocate the memory
+    } else {
+        if (igraph_matrix_init(&igraph_res, nvertices, ndim)) {
+            igraph_vector_bool_destroy(&igraph_is_fixed);
+            igraph_vector_destroy(&igraph_dist);
+            return NULL;
+        }
+    }
+
+    // TODO: convert edgelist
 
     return PyLong_FromLong(2);
 
