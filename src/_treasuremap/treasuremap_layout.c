@@ -781,30 +781,6 @@ static igraph_error_t igraph_i_umap_optimize_layout_stochastic_gradient(const ig
     return IGRAPH_SUCCESS;
 }
 
-/* Center layout around (0,0) at the end, just for convenience */
-static igraph_error_t igraph_i_umap_center_layout(igraph_matrix_t *layout) {
-    igraph_integer_t no_of_nodes = igraph_matrix_nrow(layout);
-    igraph_real_t xm = 0, ym = 0;
-
-    /* Compute center */
-    xm = 0;
-    ym = 0;
-    for (igraph_integer_t i = 0; i < no_of_nodes; i++) {
-        xm += MATRIX(*layout, i, 0);
-        ym += MATRIX(*layout, i, 1);
-    }
-    xm /= no_of_nodes;
-    ym /= no_of_nodes;
-
-    /* Shift vertices */
-    for (igraph_integer_t i = 0; i < no_of_nodes; i++) {
-        MATRIX(*layout, i, 0) -= xm;
-        MATRIX(*layout, i, 1) -= ym;
-    }
-
-    return IGRAPH_SUCCESS;
-}
-
 
 /* Check the distances argument, which should be NULL or a vector of nonnegative numbers */
 static igraph_error_t igraph_i_umap_check_distances(const igraph_vector_t *distances, igraph_integer_t no_of_edges) {
@@ -901,9 +877,6 @@ static igraph_error_t igraph_layout_treasuremap(
     igraph_vector_destroy(&umap_weights);
     IGRAPH_FINALLY_CLEAN(1);
     RNG_END();
-
-    /* Center layout */
-    IGRAPH_CHECK(igraph_i_umap_center_layout(res));
 
     return IGRAPH_SUCCESS;
 }

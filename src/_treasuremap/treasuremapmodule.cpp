@@ -139,14 +139,11 @@ py::array_t<double> layout_treasuremap(
 
     // Convert output back to Python
     auto result = py::array_t<double>(nvertices * 2);
-    buf = result.request();
-    ptr_double = static_cast<double *>(buf.ptr);
-    for (long i = 0; i < nvertices; i++)
-        for (long j = 0; j < 2; j++)
-            ptr_long[i * 2 + j] = MATRIX(igraph_res, i, j);
-    // NOTE: C++ STL takes care of destructor when going out of scope
-    std::vector<int> new_shape{(int)nvertices, 2};
-    result = result.reshape(new_shape);
+    //buf = result.request();
+    //ptr_double = static_cast<double *>(buf.ptr);
+    //for (long i = 0; i < nvertices; i++)
+    //    for (long j = 0; j < 2; j++)
+    //        ptr_long[i * 2 + j] = MATRIX(igraph_res, i, j);
 
     // Destroy low-level object
     igraph_matrix_destroy(&igraph_res);

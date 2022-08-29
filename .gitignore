@@ -4,3 +4,4 @@ vendor/install
 
 src/treasuremap.egg-info/
 .venv
+*.pyc

@@ -6,7 +6,7 @@ from _treasuremap import _layout_treasuremap
 
 def layout_treasuremap(
         graph : ig.Graph,
-        distances=None,
+        dist=None,
         seed=None,
         is_fixed=None,
         min_dist=0.01,
@@ -26,8 +26,8 @@ def layout_treasuremap(
         is_fixed = graph.vs[is_fixed]
     is_fixed = np.asarray(is_fixed)
 
-    if distances is None:
-        distances = np.ones(len(edges))
+    if dist is None:
+        dist = np.ones(len(edges))
 
     if min_dist < 0:
         raise ValueError(f"Minimum distance must be positive, got {min_dist}")
@@ -44,7 +44,7 @@ def layout_treasuremap(
     # Call C function
     result = _layout_treasuremap(
         edges,
-        distances,
+        dist,
         seed,
         use_seed,
         is_fixed,
@@ -53,6 +53,11 @@ def layout_treasuremap(
         epochs,
         dim,
     )
+    result = result.reshape((nvertices, 2))
 
-    result = ig.Layout(list(result.reshape((nvertices, 2))))
+    # Recenter
+    result -= result.mean(axis=0)
+
+    # Make Layout
+    result = ig.Layout(list(result))
     return result
