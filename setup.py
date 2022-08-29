@@ -641,7 +641,7 @@ class BuildConfiguration:
         if not buildcfg.has_pkgconfig:
             return False
 
-        cmd = ["pkg-config", "igraph", "--cflags", "--libs"]
+        cmd = ["pkg-config", "_treasuremap", "--cflags", "--libs"]
         if self.static_extension:
             cmd += ["--static"]
         line, exit_code = get_output_single_line(cmd)
@@ -798,7 +798,7 @@ sources = [
 #sources.append(os.path.join("src", "_igraph", "force_cpp_linker.cpp"))
 
 #headers = ["src/_igraph/igraphmodule_api.h"] if not SKIP_HEADER_INSTALL else []
-headers = []
+headers = ["src/_treasuremap/treasuremap_layout.h", "src/_treasuremap/convert.h"]
 
 # The main interface is through Pybind11Extension.
 # * You can add cxx_std=11/14/17, and then build_ext can be removed.

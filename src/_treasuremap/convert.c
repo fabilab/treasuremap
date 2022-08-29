@@ -1,6 +1,81 @@
 #include <Python.h>
 #include <igraph_constructors.h>
 
+#include "convert.h"
+
+/**
+ * \brief Converts a PyLong to an igraph \c igraph_integer_t
+ *
+ * Raises suitable Python exceptions when needed.
+ *
+ * This function differs from the next one because it is less generic,
+ * i.e. the Python object has to be a PyLong
+ *
+ * \param object the PyLong to be converted
+ * \param v the result is stored here
+ * \return 0 if everything was OK, 1 otherwise
+ */
+int PyLong_to_integer_t(PyObject* obj, igraph_integer_t* v) {
+  if (IGRAPH_INTEGER_SIZE == 64) {
+    /* here the assumption is that sizeof(long long) == 64 bits; anyhow, this
+     * is the widest integer type that we can convert a PyLong to so we cannot
+     * do any better than this */
+    long long int dummy = PyLong_AsLongLong(obj);
+    if (PyErr_Occurred()) {
+      return 1;
+    }
+    *v = dummy;
+  } else {
+    /* this is either 32-bit igraph, or some weird, officially not-yet-supported
+     * igraph flavour. Let's try to be on the safe side and assume 32-bit. long
+     * ints are at least 32 bits so we will fit, otherwise Python will raise
+     * an OverflowError on its own */
+    long int dummy = PyLong_AsLong(obj);
+    if (PyErr_Occurred()) {
+      return 1;
+    }
+    *v = dummy;
+  }
+  return 0;
+}
+
+/**
+ * \brief Converts a Python object to an igraph \c igraph_integer_t
+ *
+ * Raises suitable Python exceptions when needed.
+ *
+ * \param object the Python object to be converted
+ * \param v the result is stored here
+ * \return 0 if everything was OK, 1 otherwise
+ */
+int igraphmodule_PyObject_to_integer_t(PyObject *object, igraph_integer_t *v) {
+  int retval;
+  igraph_integer_t num;
+
+  if (object == NULL) {
+  } else if (PyLong_Check(object)) {
+    retval = PyLong_to_integer_t(object, &num);
+    if (retval)
+      return retval;
+    *v = num;
+    return 0;
+  } else if (PyNumber_Check(object)) {
+    /* try to recast as PyLong */
+    PyObject *i = PyNumber_Long(object);
+    if (i == NULL)
+      return 1;
+    /* as above, plus decrement the reference for the temp variable */
+    retval = PyLong_to_integer_t(i, &num);
+    Py_DECREF(i);
+    if (retval)
+      return retval;
+    *v = num;
+    return 0;
+  }
+  PyErr_BadArgument();
+  return 1;
+}
+
 /**
  * \brief Converts a Python object to an igraph \c igraph_real_t
  *
@@ -131,6 +206,118 @@ int igraphmodule_PyObject_float_to_vector_t(PyObject *list, igraph_vector_t *v) 
   return 0;
 }
 
+/**
+ * \ingroup python_interface_conversion
+ * \brief Converts a Python list of ints to an igraph \c igraph_vector_int_t
+ * The incoming \c igraph_vector_int_t should be uninitialized.
+ * Raises suitable Python exceptions when needed.
+ *
+ * This function is almost identical to
+ * \ref igraphmodule_PyObject_to_vector_t . Make sure you fix bugs
+ * in both cases (if any).
+ *
+ * \param list the Python list to be converted
+ * \param v the \c igraph_vector_int_t containing the result
+ * \return 0 if everything was OK, 1 otherwise
+ */
+int igraphmodule_PyObject_to_vector_int_t(PyObject *list, igraph_vector_int_t *v) {
+  PyObject *it = 0, *item;
+  igraph_integer_t value = 0;
+  Py_ssize_t i, j, k;
+  int ok;
+
+  if (PyUnicode_Check(list)) {
+    /* It is highly unlikely that a string (although it is a sequence) will
+     * provide us with integers or integer pairs */
+    PyErr_SetString(PyExc_TypeError, "expected a sequence or an iterable containing integers");
+    return 1;
+  }
+
+  if (!PySequence_Check(list)) {
+    /* try to use an iterator */
+    it = PyObject_GetIter(list);
+    if (it) {
+      if (igraph_vector_int_init(v, 0)) {
+        //igraphmodule_handle_igraph_error();
+        Py_DECREF(it);
+        return 1;
+      }
+
+      while ((item = PyIter_Next(it)) != 0) {
+        if (!PyNumber_Check(item)) {
+          PyErr_SetString(PyExc_TypeError, "iterable must return numbers");
+          ok = 0;
+        } else {
+          ok = (igraphmodule_PyObject_to_integer_t(item, &value) == 0);
+        }
+
+        if (ok == 0) {
+          igraph_vector_int_destroy(v);
+          Py_DECREF(item);
+          Py_DECREF(it);
+          return 1;
+        }
+
+        if (igraph_vector_int_push_back(v, value)) {
+          //igraphmodule_handle_igraph_error();
+          igraph_vector_int_destroy(v);
+          Py_DECREF(item);
+          Py_DECREF(it);
+          return 1;
+        }
+
+        Py_DECREF(item);
+      }
+
+      Py_DECREF(it);
+    } else {
+      PyErr_SetString(PyExc_TypeError, "sequence or iterable expected");
+      return 1;
+    }
+
+    return 0;
+  }
+
+  j = PySequence_Size(list);
+
+  if (igraph_vector_int_init(v, j)) {
+    //igraphmodule_handle_igraph_error();
+    Py_XDECREF(it);
+    return 1;
+  }
+
+  for (i = 0, k = 0; i < j; i++) {
+    item = PySequence_GetItem(list, i);
+    if (item) {
+      if (!PyNumber_Check(item)) {
+        PyErr_SetString(PyExc_TypeError, "sequence elements must be integers");
+        ok = 0;
+      } else {
+        ok = (igraphmodule_PyObject_to_integer_t(item, &value) == 0);
+      }
+
+      Py_XDECREF(item);
+
+      if (!ok) {
+        igraph_vector_int_destroy(v);
+        return 1;
+      }
+
+      VECTOR(*v)[k]=value;
+      k++;
+    } else {
+      /* this should not happen, but we return anyway.
+       * an IndexError exception was set by PyList_GetItem
+       * at this point */
+      igraph_vector_int_destroy(v);
+      return 1;
+    }
+  }
+
+  return 0;
+}
+
+
 
 /**
  * \ingroup python_interface_conversion
@@ -258,3 +445,51 @@ int igraphmodule_PyList_to_matrix_t(PyObject* o, igraph_matrix_t *m) {
 }
 
 
+/**
+ * \ingroup python_interface_conversion
+ * \brief Converts an igraph \c igraph_matrix_t to a Python list of lists
+ *
+ * \param m the \c igraph_matrix_t containing the matrix to be converted
+ * \return the Python list of lists as a \c PyObject*, or \c NULL if an error occurred
+ */
+PyObject* igraphmodule_matrix_t_to_PyList(const igraph_matrix_t *m) {
+  PyObject *list, *row, *item;
+  Py_ssize_t nr, nc, i, j;
+
+  nr = igraph_matrix_nrow(m);
+  nc = igraph_matrix_ncol(m);
+  if (nc < 0 || nc < 0) {
+    return NULL;
+  }
+
+  // create a new Python list
+  list = PyList_New(nr);
+  if (!list) {
+    return NULL;
+  }
+
+  // populate the list with data
+  for (i = 0; i < nr; i++) {
+    row = PyList_New(nc);
+    if (!row) {
+      Py_DECREF(list);
+      return NULL;
+    }
+  
+    for (j = 0; j < nc; j++) {
+      item = PyFloat_FromDouble(MATRIX(*m, i, j));
+      if (!item) {
+        Py_DECREF(row);
+        Py_DECREF(list);
+        return NULL;
+      }
+
+      PyList_SetItem(row, j, item);  /* will not fail */
+    }
+
+    PyList_SetItem(list, i, row);  /* will not fail */   
+  }
+
+  // return the list
+  return list;
+}

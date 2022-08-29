@@ -17,14 +17,16 @@
    along with this program.  If not, see <https://www.gnu.org/licenses/>.
    */
 
-#include "igraph_layout.h"
-#include "igraph_interface.h"
-#include "igraph_lapack.h"
-#include "igraph_matrix.h"
-#include "igraph_random.h"
-#include "igraph_nongraph.h"
+#include <igraph_layout.h>
+#include <igraph_interface.h>
+#include <igraph_lapack.h>
+#include <igraph_matrix.h>
+#include <igraph_random.h>
+#include <igraph_nongraph.h>
 
 #include <math.h>
+
+#include "treasuremap_layout.h"
 
 /* rho is just the size of the distance from each vertex and its closest neighbor */
 /* sigma is the the decay from each vertex, depends on its rho and the rest of its neighbor
@@ -807,7 +809,7 @@ static igraph_error_t igraph_i_umap_check_distances(const igraph_vector_t *dista
 
 /* This is the main function that works for any dimensionality of the embedding
  * (currently hard-constrained to 2 or 3 ONLY in the initialization). */
-static igraph_error_t igraph_layout_treasuremap(
+igraph_error_t igraph_layout_treasuremap(
         const igraph_t *graph,
         igraph_matrix_t *res,
         igraph_bool_t use_seed,
@@ -829,13 +831,6 @@ static igraph_error_t igraph_layout_treasuremap(
     IGRAPH_CHECK(igraph_i_umap_check_distances(distances, no_of_edges));
 
     if (use_seed) {
-        if((igraph_matrix_nrow(res) != no_of_nodes) || (igraph_matrix_ncol(res) != ndim)) {
-          IGRAPH_ERRORF("Seed layout should have %ld points in %ld dimensions, got %ld points in %ld dimensions.",
-                  IGRAPH_EINVAL, no_of_nodes, ndim,
-                  igraph_matrix_nrow(res),
-                  igraph_matrix_ncol(res));
-        }
-
         /* Trivial graphs (0 or 1 nodes) with seed - do nothing */
         if (no_of_nodes <= 1)
             return IGRAPH_SUCCESS;

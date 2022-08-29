@@ -28,7 +28,12 @@ def layout_treasuremap(
     if len(is_fixed) != nvertices:
         raise ValueError("is_fixed must be a boolean vector of length n. vertices")
 
-    edges = graph.get_edgelist()
+    edges = []
+    for edge in graph.get_edgelist():
+        edges.extend(list(edge))
+    if len(edges) == 0:
+        raise ValueError("graph has no edges, Treasuremap cannot do much...")
+
     if dist is None:
         dist = [1] * nedges
     if len(dist) != nedges:
