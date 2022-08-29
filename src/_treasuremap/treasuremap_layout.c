@@ -849,28 +849,6 @@ static igraph_error_t igraph_layout_treasuremap(
     /* The smoothing parameters given min_dist */
     igraph_real_t a, b;
 
-    /* Check input arguments */
-    if (min_dist <= 0) {
-        IGRAPH_ERRORF("Minimum distance must be positive, got %g.",
-                IGRAPH_EINVAL, min_dist);
-    }
-
-    if (epochs < 0) {
-        IGRAPH_ERRORF("Number of epochs must be non-negative, got %" IGRAPH_PRId ".",
-                IGRAPH_EINVAL, epochs);
-    }
-
-    if ((sampling_prob <= 0) || (sampling_prob > 1)) {
-        IGRAPH_ERRORF("Sampling probability must be in (0, 1], got %g.",
-                IGRAPH_EINVAL, sampling_prob);
-    }
-
-    if ((ndim != 2) && (ndim != 3)) {
-        IGRAPH_ERRORF("Number of dimensions must be 2 or 3, got %" IGRAPH_PRId ".",
-                IGRAPH_EINVAL, ndim);
-
-    }
-
     /* UMAP is sometimes used on unweighted graphs, that means distances are always zero */
     IGRAPH_CHECK(igraph_i_umap_check_distances(distances, no_of_edges));
 

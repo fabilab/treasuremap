@@ -1,3 +1,6 @@
 build
 vendor/build
 vendor/install
+
+src/treasuremap.egg-info/
+.venv

@@ -1,55 +1,58 @@
 import numpy as np
+import igraph as ig
 
 from _treasuremap import _layout_treasuremap
 
 
-def fit(
-    graph=None,
-    seed=None,
-    is_fixed=None,
-    distances=None,
-    min_dist=0.01,
-    sampling_probability=1.0,
-    epochs=10,
-    ndim=2,
-):
+def layout_treasuremap(
+        graph : ig.Graph,
+        distances=None,
+        seed=None,
+        is_fixed=None,
+        min_dist=0.01,
+        sampling_prob=1.0,
+        epochs=10,
+        dim=2,
+    ):
 
-    # FIXME
-    if graph is None:
-        import igraph as ig
-        nvertices = 6
-        graph = ig.Graph(
-            nvertices,
-            [[0, 1], [4, 5], [0, 3], [0, 2]],
-        )
-        seed = np.arange(nvertices * 2).reshape((nvertices, 2))
-        is_fixed = [0, 1, 0, 1, 0, 1]
-
+    use_seed = seed is not None
     nvertices = graph.vcount()
     edges = graph.get_edgelist()
+    edges = np.asarray(edges)
 
     if is_fixed is None:
         is_fixed = np.zeros(nvertices, int)
     elif isinstance(is_fixed, str):
         is_fixed = graph.vs[is_fixed]
-
-    edges = np.asarray(edges)
     is_fixed = np.asarray(is_fixed)
 
     if distances is None:
         distances = np.ones(len(edges))
 
+    if min_dist < 0:
+        raise ValueError(f"Minimum distance must be positive, got {min_dist}")
+
+    if epochs < 0:
+        raise ValueError(f"Number of epochs must be non-negative, got {min_dist}")
+
+    if (sampling_prob <= 0) or (sampling_prob > 1):
+        raise ValueError(f"Sampling probability must be in (0, 1], for {sampling_prob}")
+
+    if dim not in (2, 3):
+        raise ValueError(f"Number of dimensions must be 2 or 3, for {dim}")
+
     # Call C function
     result = _layout_treasuremap(
-        seed,
         edges,
         distances,
+        seed,
+        use_seed,
         is_fixed,
         min_dist,
-        sampling_probability,
+        sampling_prob,
         epochs,
-        ndim,
+        dim,
     )
 
-    result = result.reshape((nvertices, 2))
+    result = ig.Layout(list(result.reshape((nvertices, 2))))
     return result

@@ -796,7 +796,8 @@ sources = [
 ]
 #sources.append(os.path.join("src", "_igraph", "force_cpp_linker.cpp"))
 
-headers = ["src/_igraph/igraphmodule_api.h"] if not SKIP_HEADER_INSTALL else []
+#headers = ["src/_igraph/igraphmodule_api.h"] if not SKIP_HEADER_INSTALL else []
+headers = []
 
 # The main interface is through Pybind11Extension.
 # * You can add cxx_std=11/14/17, and then build_ext can be removed.
@@ -839,14 +840,18 @@ options = dict(
     packages=find_packages(
         where="src",
     ),
-    install_requires=["texttable>=1.6.2"],
+    install_requires=[
+        "texttable>=1.6.2",
+        "pybind11>=2.10.0",
+        "numpy>=1.19.0; platform_python_implementation != 'PyPy'",
+        "igraph>=0.9",
+        ],
     extras_require={
         "matplotlib": ["matplotlib>=3.3.0; platform_python_implementation != 'PyPy'"],
         "test": [
             "pytest>=6.2.5",
-            "numpy>=1.19.0; platform_python_implementation != 'PyPy'",
-            "pandas>=1.1.0; platform_python_implementation != 'PyPy'",
             "scipy>=1.5.0; platform_python_implementation != 'PyPy'",
+            "pandas>=1.1.0; platform_python_implementation != 'PyPy'",
             "matplotlib>=3.3.4; platform_python_implementation != 'PyPy'",
             # matplotlib requires Pillow; however, Pillow >= 8.4 does not
             # provide manylinux2010 wheels any more, but we need those in
