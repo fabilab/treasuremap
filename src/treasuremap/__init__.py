@@ -190,6 +190,7 @@ def coembed_with_northstar(
         sampling_prob=1.0,
         epochs=10,
         northstar_options=None,
+        northstar_cluster=False,
     ):
     import northstar
     import pandas as pd
@@ -246,5 +247,9 @@ def coembed_with_northstar(
     result = pd.DataFrame(
         layout.coords, columns=columns, index=index,
     )
+
+    if northstar_cluster:
+        model.cluster_graph()
+        result[model.atlas_annotation_column] = model.adata_merge.obs[model.atlas_annotation_column]
 
     return result

@@ -72,7 +72,7 @@ adata_fixed = ...
 # adata to co-embed
 adata_new = ...
 
-embedding = treasuremap.embed_with_northstar(
+embedding = treasuremap.coembed_with_northstar(
    adata_fixed, adata_new,
    seed_name='umap',
 )
