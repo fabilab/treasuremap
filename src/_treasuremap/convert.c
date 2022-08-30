@@ -493,3 +493,74 @@ PyObject* igraphmodule_matrix_t_to_PyList(const igraph_matrix_t *m) {
   // return the list
   return list;
 }
+
+
+/**
+ * \ingroup python_interface_conversion
+ * \brief Converts a Python iterable of non-negative integer pairs (i.e. an
+ * edge list) to an igraph \c igraph_vector_t
+ *
+ * The incoming \c igraph_vector_int_t should be uninitialized. Raises suitable
+ * Python exceptions when needed.
+ *
+ * \param list the Python list to be converted
+ * \param v the \c igraph_vector_int_t containing the result
+ * \return 0 if everything was OK, 1 otherwise
+ */
+int igraphmodule_PyObject_to_edgelist(
+    PyObject *list, igraph_vector_int_t *v
+) {
+  PyObject *item, *i1, *i2, *it;
+  int ok;
+  igraph_integer_t idx1=0, idx2=0;
+
+  if (PyUnicode_Check(list)) {
+    /* It is highly unlikely that a string (although it is a sequence) will
+     * provide us with integers or integer pairs */
+    PyErr_SetString(PyExc_TypeError, "expected a sequence or an iterable containing integer or string pairs");
+    return 1;
+  }
+
+  it = PyObject_GetIter(list);
+  if (!it)
+    return 1;
+
+  igraph_vector_int_init(v, 0);
+
+  while ((item = PyIter_Next(it)) != 0) {
+    ok = 1;
+    if (!PySequence_Check(item) || PySequence_Size(item) != 2) {
+      PyErr_SetString(PyExc_TypeError, "iterable must return pairs of integers or strings");
+      ok = 0;
+    } else {
+      i1 = PySequence_GetItem(item, 0);
+      i2 = i1 ? PySequence_GetItem(item, 1) : 0;
+      ok = (i1 != 0 && i2 != 0);
+      ok = ok && !igraphmodule_PyObject_to_integer_t(i1, &idx1);
+      ok = ok && !igraphmodule_PyObject_to_integer_t(i2, &idx2);
+      Py_XDECREF(i1); Py_XDECREF(i2); /* PySequence_ITEM returned new ref */
+    }
+
+    Py_DECREF(item);
+
+    if (ok) {
+      if (igraph_vector_int_push_back(v, idx1)) {
+        //igraphmodule_handle_igraph_error();
+        ok = 0;
+      }
+      if (ok && igraph_vector_int_push_back(v, idx2)) {
+        //igraphmodule_handle_igraph_error();
+        ok = 0;
+      }
+    }
+
+    if (!ok) {
+      igraph_vector_int_destroy(v);
+      Py_DECREF(it);
+      return 1;
+    }
+  }
+
+  Py_DECREF(it);
+  return 0;
+}

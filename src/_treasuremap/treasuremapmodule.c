@@ -58,7 +58,7 @@ static PyObject* treasuremapmodule_treasuremap(PyObject *self, PyObject *args, P
     }
 
     // edgelist (already flattened)
-    if (igraphmodule_PyObject_to_vector_int_t(edges_o, &igraph_edges)) {
+    if (igraphmodule_PyObject_to_edgelist(edges_o, &igraph_edges)) {
         igraph_matrix_destroy(&igraph_res);
         igraph_vector_bool_destroy(&igraph_is_fixed);
         igraph_vector_destroy(&igraph_distances);

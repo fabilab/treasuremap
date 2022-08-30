@@ -45,4 +45,6 @@ int igraphmodule_PyObject_to_vector_bool_t(PyObject *list, igraph_vector_bool_t 
 int igraphmodule_PyList_to_matrix_t(PyObject *o, igraph_matrix_t *m);
 
 PyObject* igraphmodule_matrix_t_to_PyList(const igraph_matrix_t *m);
+
+int igraphmodule_PyObject_to_edgelist(PyObject *list, igraph_vector_int_t *v);
 #endif
