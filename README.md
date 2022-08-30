@@ -27,7 +27,7 @@ pip install treasuremap
 `treasuremap` ships its own version of the `igraph` C core because a recent version (>=0.10.0rc2) is needed. If you use the Python `igraph` interface, that can be an older version (e.g. 0.9.x).
 
 ## Usage
-Treasuremap can be used either on its own to perform only the embedding step, or it can be combined with `northstar` to obtain a full workflow that starts from two adata objects, one of which is already embedded, and find a common embedding.
+Treasuremap can be used either on its own to perform only the embedding step, or it can be combined with [northstar](https://github.com/northstaratlas/northstar) to obtain a full workflow that starts from two adata objects, one of which is already embedded, and find a common embedding.
 
 ### Standalone
 ```python
@@ -75,6 +75,8 @@ adata_new = ...
 embedding = treasuremap.coembed_with_northstar(
    adata_fixed, adata_new,
    seed_name='umap',
+   northstar_cluster=True,
+   northstar_options={'atlas_annotation_column': 'cell_type'},
 )
 # the result is a pandas dataframe indexed by
 # the cell names, first the ones from adata_fixed,
