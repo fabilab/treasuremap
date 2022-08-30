@@ -15,6 +15,8 @@ import treasuremap._treasuremap as _treasuremap
 
 def _recenter(result):
     """Recenter layout after algo"""
+    if len(result) == 0:
+        return
     dim = len(result[0])
 
     # Find center
@@ -81,11 +83,6 @@ def _layout_treasuremap(
         min_dist, sampling_prob, epochs, dim,
     )
 
-    # Recenter
-    _recenter(result)
-
-    # Make Layout
-    result = Layout(list(result))
     return result
 
 
@@ -112,14 +109,17 @@ def treasuremap_adata(
     dist = dist_matrix.data
     nedges = len(dist)
 
-    obsm_name = f'X_{seed_name}'
-    if obsm_name not in adata.obsm:
-        raise KeyError("AnnData object missing {obsm_name} field")
-    seed = adata.obsm[f'X_{seed_name}']
-    seed_dim = seed.shape[1]
-    if seed_dim != dim:
-        raise ValueError("{obsm_name} is {seed_dim}D, requested {dim}D embedding")
-    seed = seed.tolist()
+    if (seed_name is None) or (seed_name == ''):
+        seed = None
+    else:
+        obsm_name = f'X_{seed_name}'
+        if obsm_name not in adata.obsm:
+            raise KeyError("AnnData object missing {obsm_name} field")
+        seed = adata.obsm[f'X_{seed_name}']
+        seed_dim = seed.shape[1]
+        if seed_dim != dim:
+            raise ValueError("{obsm_name} is {seed_dim}D, requested {dim}D embedding")
+        seed = seed.tolist()
 
     result = _layout_treasuremap(
         nvertices,
@@ -134,6 +134,10 @@ def treasuremap_adata(
         dim,
     )
     result = np.asarray(result).astype(np.float32)
+
+    # Recenter
+    if len(result):
+        result -= result.mean(axis=0)
 
     if copy:
         return result
@@ -171,6 +175,9 @@ def treasuremap_igraph(
         epochs,
         dim,
     )
+
+    # Recenter
+    _recenter(result)
 
     result = Layout(result)
     return result
