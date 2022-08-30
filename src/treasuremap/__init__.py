@@ -181,3 +181,70 @@ def treasuremap_igraph(
 
     result = Layout(result)
     return result
+
+
+def coembed_with_northstar(
+        adata_fixed, adata_new,
+        seed_name='umap',
+        min_dist=0.01,
+        sampling_prob=1.0,
+        epochs=10,
+        northstar_options=None,
+    ):
+    import northstar
+    import pandas as pd
+
+    # Prepare seed
+    obsm_name = f'X_{seed_name}'
+    if obsm_name not in adata_fixed.obsm:
+        raise KeyError(f'{obsm_name} not in adata_fixed.obsm')
+    n_fixed = adata_fixed.shape[0]
+    dim = adata_fixed.obsm[obsm_name].shape[1]
+    seed = np.zeros((n_fixed+ adata_new.shape[0], dim), np.float32)
+    seed[:n_fixed] = adata_fixed.obsm[obsm_name]
+    seed = seed.tolist()
+
+    # Prepare is_fixed
+    is_fixed = np.zeros(seed.shape[0], bool)
+    is_fixed[:n_fixed] = True
+    is_fixed = is_fixed.tolist()
+
+    # Run first part of northstar
+    if northstar_options is None:
+        northstar_options = {}
+    model = northstar.Subsample(adata_fixed, **northstar_options)
+    model.new_data = adata_new
+    model._check_init_arguments()
+    model.compute_feature_intersection()
+    model._check_feature_intersection()
+    model.prepare_feature_selection()
+    model.select_features()
+    model._check_feature_selection()
+    model.merge_atlas_newdata()
+    model.compute_pca()
+    model.compute_similarity_graph()
+
+    graph = model.graph
+    if 'distance' in graph.edge_attributes:
+        dist = graph.es['distance']
+    else:
+        dist = None
+
+    layout = treasuremap_igraph(
+        graph,
+        dist=dist,
+        seed=seed,
+        is_fixed=is_fixed,
+        min_dist=min_dist,
+        sampling_prob=sampling_prob,
+        epochs=epochs,
+        dim=dim,
+    )
+
+    index = adata_fixed.obs_names.tolist() + adata_new.obs_names.tolist()
+    columns = ['treasuremap_'+str(i+1) for i in range(dim)]
+    result = pd.DataFrame(
+        layout.coords, columns=columns, index=index,
+    )
+
+    return result

@@ -72,12 +72,13 @@ adata_fixed = ...
 # adata to co-embed
 adata_new = ...
 
-adata_combined = treasuremap.embed_with_northstar(
+embedding = treasuremap.embed_with_northstar(
    adata_fixed, adata_new,
    seed_name='umap',
 )
-# the result is stored here
-adata_combined.obs['treasuremap']
+# the result is a pandas dataframe indexed by
+# the cell names, first the ones from adata_fixed,
+# followed by the ones from adata_new
 ```
 
 ## Citation
