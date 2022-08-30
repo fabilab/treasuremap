@@ -1,5 +1,5 @@
 # treasuremap
-![Logo](https://raw.githubusercontent.com/iosonofabio/treasuremap/raw/master/logo.png)
+![Logo](https://raw.githubusercontent.com/iosonofabio/treasuremap/master/logo.png)
 
 Treasuremap is a variation of UMAP that embeds a network with some fixed nodes.
 
