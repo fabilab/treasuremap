@@ -4,7 +4,7 @@
 Treasuremap is a variation of UMAP that embeds a network with some fixed nodes.
 
 ## Brief description
-`treasuremap` is a Python package to embed a network (often a single cell omics network) similar to UMAP [1]. Unlike UMAP, you can
+`treasuremap` is a Python package to embed a network (often a single cell omics network) derived from UMAP [1]. Unlike UMAP, you can
 specify the coordinates of some nodes/cells if they are already known. They will not change, while the rest of the space warps around them.
 
 treasuremap's superpower is using the coordinates from a known embedding (e.g. a cell atlas) and harmonizing a new data set onto that preexisting map.
@@ -85,8 +85,10 @@ embedding = treasuremap.coembed_with_northstar(
 # followed by the ones from adata_new
 ```
 
-## Citation
+## Citations
 We are writing a paper describing `treasuremap`
+
+[1] McInnes & Healy (2018), UMAP: Uniform Manifold Approximation and Projection for Dimension Reduction, arXiv.
 
 ## License
 `treasuremap` is released under the GPL 3.0 License.
