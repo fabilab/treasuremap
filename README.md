@@ -29,9 +29,10 @@ pip install treasuremap
 `treasuremap` ships its own version of the `igraph` C core because a recent version (>=0.10.0rc2) is needed. If you use the Python `igraph` interface, that can be an older version (e.g. 0.9.x).
 
 ## Usage
-Treasuremap can be used either on its own to perform only the embedding step, or it can be combined with [northstar](https://github.com/northstaratlas/northstar) to obtain a full workflow that starts from two adata objects, one of which is already embedded, and find a common embedding.
+Treasuremap can be used either on its own to perform only the embedding step, or it can be combined with [northstar](https://github.com/northstaratlas/northstar).
 
 ### Standalone
+Standalone, `treasuremap` starts from a graph and a boolean list describing what nodes should stay fixed and computes an embedding:
 ```python
 import igraph as ig
 import treasuremap
@@ -65,6 +66,9 @@ layout = treasuremap.treasuremap_igraph(
 ```
 
 ### Together with northstar
+Combining `treasuremap` with `northstar` enables a full workflow to navigate single cell data. You start from a data set that has a known cell type annotation and an existing embedding (e.g. UMAP): this is typically a cell atlas or an approximation. You then use `treasuremap` + `northstar` to analyze a new data set **onto** that template, obtaining both cell type annotation and embedding for your new data that is consistent with the atlas used.
+
+This workflow is a little more complex, therefore `treasuremap` uses a class object called `ModelWithNorthstar`:
 ```python
 import treasuremap
 
@@ -74,15 +78,22 @@ adata_fixed = ...
 # adata to co-embed
 adata_new = ...
 
-embedding = treasuremap.coembed_with_northstar(
+model = treasuremap.ModelWithNorthstar(
    adata_fixed, adata_new,
    seed_name='umap',
    northstar_cluster=True,
    northstar_options={'atlas_annotation_column': 'cell_type'},
 )
+
+model.build_graph()
+model.cluster_graph()
+model.embed_graph()
+
 # the result is a pandas dataframe indexed by
 # the cell names, first the ones from adata_fixed,
-# followed by the ones from adata_new
+# followed by the ones from adata_new. Columns are
+# one for annotation and one for each embedding dimension
+result = model.result
 ```
 
 ## Citations
