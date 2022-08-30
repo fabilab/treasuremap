@@ -27,45 +27,64 @@ pip install treasuremap
 `treasuremap` ships its own version of the `igraph` C core because a recent version (>=0.10.0rc2) is needed. If you use the Python `igraph` interface, that can be an older version (e.g. 0.9.x).
 
 ## Usage
-The typical u
+Treasuremap can be used either on its own to perform only the embedding step, or it can be combined with `northstar` to obtain a full workflow that starts from two adata objects, one of which is already embedded, and find a common embedding.
+
+### Standalone
 ```python
-import northstar
+import igraph as ig
+import treasuremap
 
-# Choose an atlas
-atlas_name = 'Darmanis_2015'
+# Generate a random similarity graph
+graph = ig.Graph(n=6, edges=[
+    (0, 1),
+    (0, 2),
+    (0, 3),
+    (3, 4),
+    (4, 5),
+    ])
+distances = [0.1, 0.3, 0.1, 0.2, 0.1]
 
-# Get a gene expression matrix of the new dataset (here a
-# random matrix for simplicity)
-N = 200
-L = 50
-new_dataset = pd.DataFrame(
-    data=np.random.rand(L, N).astype(np.float32),
-    index=<gene_list>,
-    columns=['cell_'+str(i+1) for i in range(N)],
-    )
+# Initial coordinates
+seed = [[-1, 1],
+        [-1, 0.5],
+        [0, 0],
+        [0, 0],
+        [0, 0],
+        [0, 0]]
 
-# Initialize northstar classes
-model = northstar.Averages(
-        atlas='Darmanis_2015',
-        n_neighbors=5,
-        n_pcs=10,
-        )
+# Set which nodes coordinates are fixed
+is_fixed = [True, True, False, False, False, False]
 
-# Run the classifier
-model.fit(new_dataset)
+# Compute graph layout without touching the coordinates
+# of the first two vertices
+layout = treasuremap.treasuremap_igraph(
+    graph, dist=distances, seed=seed, is_fixed=is_fixed,
+)
+```
 
-# Get the cluster memberships for the new cells
-membership = model.membership
+### Together with northstar
+```python
+import treasuremap
+
+# adata with known embedding
+adata_fixed = ...
+
+# adata to co-embed
+adata_new = ...
+
+adata_combined = treasuremap.embed_with_northstar(
+   adata_fixed, adata_new,
+   seed_name='umap',
+)
+# the result is stored here
+adata_combined.obs['treasuremap']
 ```
 
 ## Citation
-If you use this software please cite the following paper:
-
-Fabio Zanini\*, Bojk A. Berghuis\*, Robert C. Jones, Benedetta Nicolis di Robilant, Rachel Yuan Nong, Jeffrey Norton, Michael F. Clarke, Stephen R. Quake. **Northstar enables automatic classification of known and novel cell types from tumor samples.** Scientific Reports 10, Article number: 15251 (2020), DOI: https://doi.org/10.1038/s41598-020-71805-1
+We are writing a paper describing `treasuremap`
 
 ## License
+`treasuremap` is released under the GPL 3.0 License.
+Parts of the code are adapted from `igraph`, which is released under the GPL 2.0 License.
 `northstar` is released under the MIT license.
 
-NOTE: The module leidenalg to perform graph-based clstering is released
-under the GLP3 license. You agree with those licensing terms if you use
-leidenalg within northstar.
