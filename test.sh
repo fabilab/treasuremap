@@ -32,7 +32,7 @@ shift $((OPTIND -1))
 
 if [ ! -d $VENV_DIR ]; then
     $PYTHON -m venv $VENV_DIR
-    $VENV_DIR/bin/pip install -U pip wheel pybind11
+    $VENV_DIR/bin/pip install -U pip wheel
 fi
 
 rm -rf build/

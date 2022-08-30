@@ -16,6 +16,7 @@ static PyObject* treasuremapmodule_treasuremap(PyObject *self, PyObject *args, P
     PyObject *output;
     bool use_seed = false;
 
+    igraph_error_t return_code = 0;
     igraph_vector_int_t igraph_edges;
     igraph_vector_t igraph_distances;
     igraph_vector_bool_t igraph_is_fixed;
@@ -23,14 +24,12 @@ static PyObject* treasuremapmodule_treasuremap(PyObject *self, PyObject *args, P
     igraph_matrix_t igraph_res;
 
     /* Parse arguments */
-    if(!PyArg_ParseTupleAndKeywords(args, kwds, "llOOOOddli", kwlist,
+    if(!PyArg_ParseTupleAndKeywords(args, kwds, "llOOOOddll", kwlist,
                                     &nvertices, &nedges,
                                     &edges_o, &dist_o, &seed_o, &is_fixed_o,
                                     &min_dist, &sampling_probability,
-                                    &epochs, &ndim)) {
+                                    &epochs, &ndim))
         return NULL;
-    }
-
 
     if (igraphmodule_PyObject_to_vector_bool_t(is_fixed_o, &igraph_is_fixed))
         return NULL;
@@ -76,7 +75,7 @@ static PyObject* treasuremapmodule_treasuremap(PyObject *self, PyObject *args, P
     igraph_vector_int_destroy(&igraph_edges);
 
     // Call C fuction
-    igraph_error_t return_code = igraph_layout_treasuremap(
+    return_code = igraph_layout_treasuremap(
             &igraph_graph,
             &igraph_res,
             use_seed,
@@ -84,7 +83,7 @@ static PyObject* treasuremapmodule_treasuremap(PyObject *self, PyObject *args, P
             min_dist,
             epochs,
             sampling_probability,
-            ndim,
+            (int) ndim,
             &igraph_is_fixed);
 
     // Destroy intermediate data structures

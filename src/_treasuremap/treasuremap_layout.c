@@ -821,7 +821,6 @@ igraph_error_t igraph_layout_treasuremap(
         const igraph_vector_bool_t *is_fixed) {
 
     igraph_integer_t no_of_edges = igraph_ecount(graph);
-    igraph_integer_t no_of_nodes = igraph_vcount(graph);
     /* probabilities of each edge being a real connection */
     igraph_vector_t umap_weights;
     /* The smoothing parameters given min_dist */
@@ -830,19 +829,7 @@ igraph_error_t igraph_layout_treasuremap(
     /* UMAP is sometimes used on unweighted graphs, that means distances are always zero */
     IGRAPH_CHECK(igraph_i_umap_check_distances(distances, no_of_edges));
 
-    if (use_seed) {
-        /* Trivial graphs (0 or 1 nodes) with seed - do nothing */
-        if (no_of_nodes <= 1)
-            return IGRAPH_SUCCESS;
-        
-    } else {
-         /* Trivial graphs (0 or 1 nodes) beget trivial - but valid - layouts */
-         if (no_of_nodes <= 1) {
-             IGRAPH_CHECK(igraph_matrix_resize(res, no_of_nodes, ndim));
-             igraph_matrix_null(res);
-             return IGRAPH_SUCCESS;
-         }
-
+    if (!use_seed) {
         /* Skip spectral embedding for now (see #1971), initialize at random */
         if (ndim == 2) {
             igraph_layout_random(graph, res);

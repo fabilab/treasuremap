@@ -462,7 +462,7 @@ class BuildConfiguration:
                 ext = first(
                     extension
                     for extension in self.extensions
-                    if extension.name == "_treasuremap"
+                    if extension.name == "treasuremap._treasuremap"
                 )
                 buildcfg.configure(ext)
 
@@ -641,7 +641,7 @@ class BuildConfiguration:
         if not buildcfg.has_pkgconfig:
             return False
 
-        cmd = ["pkg-config", "_treasuremap", "--cflags", "--libs"]
+        cmd = ["pkg-config", "treasuremap._treasuremap", "--cflags", "--libs"]
         if self.static_extension:
             cmd += ["--static"]
         line, exit_code = get_output_single_line(cmd)
@@ -799,6 +799,7 @@ sources = [
 
 #headers = ["src/_igraph/igraphmodule_api.h"] if not SKIP_HEADER_INSTALL else []
 headers = ["src/_treasuremap/treasuremap_layout.h", "src/_treasuremap/convert.h"]
+headers = []
 
 # The main interface is through Pybind11Extension.
 # * You can add cxx_std=11/14/17, and then build_ext can be removed.
@@ -809,7 +810,7 @@ headers = ["src/_treasuremap/treasuremap_layout.h", "src/_treasuremap/convert.h"
 #   Sort input source files if you glob sources to ensure bit-for-bit
 #   reproducible builds (https://github.com/pybind/python_example/pull/53)
 treasuremap_extension = Extension(
-    "_treasuremap",
+    "treasuremap._treasuremap",
     sources,
 )
 
@@ -843,12 +844,13 @@ options = dict(
         "texttable>=1.6.2",
         "pybind11>=2.10.0",
         "numpy>=1.19.0; platform_python_implementation != 'PyPy'",
-        "igraph>=0.9",
         ],
     extras_require={
         "matplotlib": ["matplotlib>=3.3.0; platform_python_implementation != 'PyPy'"],
         "test": [
             "pytest>=6.2.5",
+            "igraph>=0.9.0",
+            "anndata>=0.8.0",
             "scipy>=1.5.0; platform_python_implementation != 'PyPy'",
             "pandas>=1.1.0; platform_python_implementation != 'PyPy'",
             "matplotlib>=3.3.4; platform_python_implementation != 'PyPy'",
