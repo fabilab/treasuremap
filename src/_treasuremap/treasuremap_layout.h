@@ -29,6 +29,9 @@
 
 #include <math.h>
 
+/* NOTE: support also a spread? */
+igraph_error_t fit_ab(igraph_real_t min_dist, igraph_real_t *a_p, igraph_real_t *b_p);
+
 /* This is the main function that works for any dimensionality of the embedding
  * (currently hard-constrained to 2 or 3 ONLY in the initialization). */
 igraph_error_t igraph_layout_treasuremap(
@@ -40,7 +43,8 @@ igraph_error_t igraph_layout_treasuremap(
         igraph_integer_t epochs,
         igraph_real_t sampling_prob,
         igraph_integer_t ndim,
-        const igraph_vector_bool_t *is_fixed);
+        const igraph_vector_bool_t *is_fixed,
+        igraph_real_t a,
+        igraph_real_t b);
 
 #endif
-

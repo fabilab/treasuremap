@@ -106,9 +106,12 @@ def treasuremap_adata(
     dist_matrix = adata.obsp['distances'].tocoo()
 
     edges = list(zip(dist_matrix.row, dist_matrix.col))
-    dist = dist_matrix.data
+    dist = list(dist_matrix.data)
     nedges = len(dist)
+    if is_fixed is not None:
+        is_fixed = [True if x else False for x in is_fixed]
 
+    kwargs = {}
     if (seed_name is None) or (seed_name == ''):
         seed = None
     else:
@@ -121,6 +124,12 @@ def treasuremap_adata(
             raise ValueError("{obsm_name} is {seed_dim}D, requested {dim}D embedding")
         seed = seed.tolist()
 
+        if (seed_name in adata.uns) and ('params' in adata.uns[seed_name]):
+            if 'a' in adata.uns[seed_name]['params']:
+                kwargs['a'] = adata.uns[seed_name]['params']['a']
+            if 'b' in adata.uns[seed_name]['params']:
+                kwargs['b'] = adata.uns[seed_name]['params']['a']
+
     result = _layout_treasuremap(
         nvertices,
         nedges,
@@ -132,6 +141,7 @@ def treasuremap_adata(
         sampling_prob,
         epochs,
         dim,
+        **kwargs,
     )
     result = np.asarray(result).astype(np.float32)
 

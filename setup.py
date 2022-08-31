@@ -792,6 +792,7 @@ buildcfg.process_args_from_command_line()
 # Define the extension
 sources = [
     "src/_treasuremap/convert.c",
+    "src/_treasuremap/fit_ab.c",
     "src/_treasuremap/treasuremap_layout.c",
     "src/_treasuremap/treasuremapmodule.c",
 ]
