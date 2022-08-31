@@ -17,5 +17,5 @@ class TreasuremapTests(unittest.TestCase):
             ]
         for min_dist, (a_exp, b_exp) in expected:
             a, b = fit_ab(min_dist)
-            self.assertEqual(a, a_exp)
-            self.assertEqual(b, b_exp)
+            self.assertAlmostEqual(a, a_exp, 1)
+            self.assertAlmostEqual(b, b_exp, 1)

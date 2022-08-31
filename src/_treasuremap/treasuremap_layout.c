@@ -510,6 +510,14 @@ static igraph_error_t igraph_i_umap_optimize_layout_stochastic_gradient(const ig
 
          /* Adjust learning rate */
         learning_rate = 1.0 - (igraph_real_t)(e + 1) / epochs;
+
+        /* Allow interruption here */
+        /* NOTE: this ends up being an implicit declaration which I guess is not great, but
+         * I'm not sure how to include <Python.h> at this stage... */
+        //if (PyErr_CheckSignals()) {
+        if(igraph_allow_interruption(NULL) != IGRAPH_SUCCESS) {
+            return IGRAPH_INTERRUPTED;
+        }
     }
 
     return IGRAPH_SUCCESS;
@@ -559,6 +567,7 @@ igraph_error_t igraph_layout_treasuremap(
         igraph_real_t b
         ) {
 
+    igraph_error_t errorcode;
     igraph_integer_t no_of_edges = igraph_ecount(graph);
     /* probabilities of each edge being a real connection */
     igraph_vector_t umap_weights;
@@ -579,15 +588,23 @@ igraph_error_t igraph_layout_treasuremap(
     IGRAPH_VECTOR_INIT_FINALLY(&umap_weights, no_of_edges);
 
     /* Make combined graph with smoothed probabilities */
-    IGRAPH_CHECK(igraph_i_umap_find_prob_graph(graph, distances, &umap_weights));
+    errorcode = igraph_i_umap_find_prob_graph(graph, distances, &umap_weights);
+    if(errorcode) {
+        RNG_END();
+        return errorcode;
+    }
 
     /* From now on everything lives in probability space, it does not matter whether
      * the original graph was weighted/distanced or unweighted */
 
     /* Minimize cross-entropy between high-d and low-d probability
      * distributions */
-    IGRAPH_CHECK(igraph_i_umap_optimize_layout_stochastic_gradient(graph, &umap_weights, a, b,
-                res, epochs, sampling_prob, is_fixed));
+    errorcode = igraph_i_umap_optimize_layout_stochastic_gradient(graph, &umap_weights, a, b,
+                res, epochs, sampling_prob, is_fixed);
+    if(errorcode) {
+        RNG_END();
+        return errorcode;
+    }
 
     igraph_vector_destroy(&umap_weights);
     IGRAPH_FINALLY_CLEAN(1);

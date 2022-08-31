@@ -160,6 +160,17 @@ static PyObject* treasuremapmodule_treasuremap(PyObject *self, PyObject *args, P
 }
 
 
+/* Connect interruption signals from inside igraph: these do not work directly
+ * with interuptions in our C code */
+static igraph_error_t treasuremapmodule_igraph_interrupt_hook(void* data) {
+  if (PyErr_CheckSignals()) {
+    IGRAPH_FINALLY_FREE();
+    return IGRAPH_INTERRUPTED;
+  }
+  return IGRAPH_SUCCESS;
+}
+
+
 static PyMethodDef treasuremapmodule_methods[] = {
     {"layout_treasuremap", (PyCFunction) treasuremapmodule_treasuremap, METH_VARARGS | METH_KEYWORDS, "Run the C-level treasuremap function"},
     {"fit_ab", (PyCFunction) treasuremapmodule_fit_ab, METH_VARARGS | METH_KEYWORDS, "Fit a and b parameters from min_dist"},
@@ -194,6 +205,9 @@ PyInit__treasuremap(void)
       PyModule_AddStringConstant(m, "__igraph_version__", version);
     }
     PyModule_AddStringConstant(m, "__build_date__", __DATE__);
+
+    /* Connect interruptibles signal */
+    igraph_set_interruption_handler(treasuremapmodule_igraph_interrupt_hook);
 
     return m;
 }
