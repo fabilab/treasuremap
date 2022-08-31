@@ -19,7 +19,10 @@
 
 #include "treasuremap_layout.h"
 
-/* Helper function to compute a and b parameters (smoothing probability metric in embedding space) */
+/* Helper function to compute a and b parameters (smoothing probability metric in
+ * embedding space). The official UMAP package has a parameter "spread" to set the
+ * scaling, but it defaults to 1.0. Here, we assume 1.0 for now, could be extended
+ * in the future */
 static igraph_error_t igraph_i_umap_get_ab_residuals(igraph_vector_t *residuals,
         igraph_real_t *squared_sum_res, igraph_integer_t nr_points, igraph_real_t a,
         igraph_real_t b, igraph_vector_t *powb, const igraph_vector_t *x, igraph_real_t min_dist)

@@ -6,6 +6,45 @@
 #include "treasuremap_layout.h"
 
 
+static PyObject* treasuremapmodule_fit_ab(PyObject *self, PyObject *args, PyObject *kwds) {
+
+    static char *kwlist[] = { "min_dist", NULL };
+    double min_dist, a, b;
+    igraph_error_t return_code;
+    PyObject *list, *item;
+
+    /* Parse arguments */
+    if(!PyArg_ParseTupleAndKeywords(args, kwds, "d", kwlist,&min_dist)) {
+        return NULL;
+    }
+
+    return_code = fit_ab(min_dist, &a, &b);
+    if (return_code != IGRAPH_SUCCESS) {
+        return NULL;
+    }
+
+    // Convert to Python list
+    list = PyList_New(2);
+    if (!list) {
+      return NULL;
+    }
+    item = PyFloat_FromDouble(a);
+    if (!item) {
+        Py_DECREF(list);
+        return NULL;
+    }
+    PyList_SetItem(list, 0, item);  /* will not fail */
+    item = PyFloat_FromDouble(b);
+    if (!item) {
+        Py_DECREF(list);
+        return NULL;
+    }
+    PyList_SetItem(list, 1, item);  /* will not fail */
+
+    return list;
+}
+
+
 static PyObject* treasuremapmodule_treasuremap(PyObject *self, PyObject *args, PyObject * kwds) {
 
     static char *kwlist[] = { "nvertices", "nedges", "edges", "dist", "seed", "is_fixed", "min_dist", "sampling_prob", "epochs", "dim", "a", "b", NULL };
@@ -123,6 +162,7 @@ static PyObject* treasuremapmodule_treasuremap(PyObject *self, PyObject *args, P
 
 static PyMethodDef treasuremapmodule_methods[] = {
     {"layout_treasuremap", (PyCFunction) treasuremapmodule_treasuremap, METH_VARARGS | METH_KEYWORDS, "Run the C-level treasuremap function"},
+    {"fit_ab", (PyCFunction) treasuremapmodule_fit_ab, METH_VARARGS | METH_KEYWORDS, "Fit a and b parameters from min_dist"},
     {NULL, NULL, 0, NULL}
 };
 
