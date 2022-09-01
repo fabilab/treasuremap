@@ -47,11 +47,11 @@ static PyObject* treasuremapmodule_fit_ab(PyObject *self, PyObject *args, PyObje
 
 static PyObject* treasuremapmodule_treasuremap(PyObject *self, PyObject *args, PyObject * kwds) {
 
-    static char *kwlist[] = { "nvertices", "nedges", "edges", "dist", "seed", "is_fixed", "min_dist", "sampling_prob", "epochs", "dim", "a", "b", NULL };
+    static char *kwlist[] = { "nvertices", "nedges", "edges", "dist", "seed", "is_fixed", "min_dist", "sampling_prob", "epochs", "dim", "negative_sampling_rate", "a", "b", NULL };
     long nedges, nvertices;
     PyObject *edges_o, *dist_o, *seed_o = Py_None, *is_fixed_o;
     double min_dist, sampling_probability;
-    long epochs, ndim;
+    long epochs, ndim, negative_sampling_rate = 5;
     PyObject *output;
     bool use_seed = false;
     double a = -1, b = -1;
@@ -64,11 +64,11 @@ static PyObject* treasuremapmodule_treasuremap(PyObject *self, PyObject *args, P
     igraph_matrix_t igraph_res;
 
     /* Parse arguments */
-    if(!PyArg_ParseTupleAndKeywords(args, kwds, "llOOOOddll|dd", kwlist,
+    if(!PyArg_ParseTupleAndKeywords(args, kwds, "llOOOOddll|ldd", kwlist,
                                     &nvertices, &nedges,
                                     &edges_o, &dist_o, &seed_o, &is_fixed_o,
                                     &min_dist, &sampling_probability,
-                                    &epochs, &ndim, &a, &b))
+                                    &epochs, &ndim, &negative_sampling_rate, &a, &b))
         return NULL;
 
     if (igraphmodule_PyObject_to_vector_bool_t(is_fixed_o, &igraph_is_fixed))
@@ -87,7 +87,8 @@ static PyObject* treasuremapmodule_treasuremap(PyObject *self, PyObject *args, P
             igraph_vector_destroy(&igraph_distances);
             return NULL;
         }
-    // Otherwise, just allocate the memory
+    // Otherwise, just make a zeroes matrix, it will be randomized
+    // by the C function later on
     } else {
         if (igraph_matrix_init(&igraph_res, nvertices, ndim)) {
             igraph_vector_bool_destroy(&igraph_is_fixed);
@@ -138,7 +139,8 @@ static PyObject* treasuremapmodule_treasuremap(PyObject *self, PyObject *args, P
             (int) ndim,
             &igraph_is_fixed,
             a,
-            b);
+            b,
+            negative_sampling_rate);
 
     // Destroy intermediate data structures
     igraph_destroy(&igraph_graph);

@@ -330,7 +330,8 @@ static igraph_error_t igraph_i_umap_apply_forces(
         const igraph_t *graph,  const igraph_vector_t *umap_weights,
         igraph_matrix_t *layout, igraph_real_t a, igraph_real_t b, igraph_real_t prob,
         igraph_real_t learning_rate, igraph_bool_t avoid_neighbor_repulsion,
-        const igraph_vector_bool_t *is_fixed)
+        const igraph_vector_bool_t *is_fixed,
+        igraph_integer_t negative_sampling_rate)
 {
     igraph_integer_t no_of_nodes = igraph_matrix_nrow(layout);
     igraph_integer_t ndim = igraph_matrix_ncol(layout);
@@ -342,6 +343,7 @@ static igraph_error_t igraph_i_umap_apply_forces(
      * not be doing UMAP.
      * */
     igraph_vector_int_t neis, negative_vertices;
+    igraph_integer_t n_negative_vertices = (no_of_nodes - 1 < negative_sampling_rate) ? (no_of_nodes - 1) : negative_sampling_rate;
 
     /* Initialize vectors */
     IGRAPH_VECTOR_INIT_FINALLY(&from_emb, ndim);
@@ -353,8 +355,6 @@ static igraph_error_t igraph_i_umap_apply_forces(
         IGRAPH_VECTOR_INT_INIT_FINALLY(&neis, 0);
     }
     IGRAPH_VECTOR_INT_INIT_FINALLY(&negative_vertices, 0);
-
-    igraph_integer_t n_random_vertices = sqrt(no_of_nodes);
 
     /* iterate over a random subsample of edges. We have an igraph_random_sample() function to
      * do that, but that one would require the allocation of a separate vector and we don't
@@ -397,14 +397,20 @@ static igraph_error_t igraph_i_umap_apply_forces(
         }
 
         /* Random other nodes are repelled from one (the first) vertex */
-        IGRAPH_CHECK(igraph_random_sample(&negative_vertices, 0, no_of_nodes - 2, n_random_vertices));
-        for (igraph_integer_t j = 0; j < n_random_vertices; j++) {
+        IGRAPH_CHECK(igraph_random_sample(&negative_vertices, 0, no_of_nodes - 2, n_negative_vertices));
+        for (igraph_integer_t j = 0; j < n_negative_vertices; j++) {
             /* Get random neighbor */
             to = VECTOR(negative_vertices)[j];
             /* obviously you cannot repel yourself */
             if (to >= from) {
                 to++;
             }
+
+            /* FIXME: test this one: fixed nodes do not repel */
+            if (VECTOR(*is_fixed)[to] != 0) {
+                continue;
+            }
+
             /* do not repel neighbors for small graphs, for big graphs this
              * does not matter as long as the k in knn << number of vertices */
             if (avoid_neighbor_repulsion) {
@@ -464,7 +470,7 @@ static igraph_error_t igraph_i_umap_apply_forces(
 static igraph_error_t igraph_i_umap_optimize_layout_stochastic_gradient(const igraph_t *graph,
        const igraph_vector_t *umap_weights, igraph_real_t a, igraph_real_t b,
        igraph_matrix_t *layout, igraph_integer_t epochs, igraph_real_t sampling_prob,
-       const igraph_vector_bool_t *is_fixed) {
+       const igraph_vector_bool_t *is_fixed, igraph_integer_t negative_sampling_rate) {
 
     igraph_real_t learning_rate = 1;
 
@@ -496,9 +502,11 @@ static igraph_error_t igraph_i_umap_optimize_layout_stochastic_gradient(const ig
 #endif
 
     for (igraph_integer_t e = 0; e < epochs; e++) {
+        // FIXME
+        fprintf(stderr, "Epoch %ld / %ld\n", e+1, epochs);
         /* Apply (stochastic) forces */
         igraph_i_umap_apply_forces(graph, umap_weights, layout, a, b, sampling_prob, learning_rate,
-                avoid_neighbor_repulsion, is_fixed);
+                avoid_neighbor_repulsion, is_fixed, negative_sampling_rate);
 
 #ifdef UMAP_DEBUG
         /* Recompute CE and check how it's going*/
@@ -564,7 +572,8 @@ igraph_error_t igraph_layout_treasuremap(
         igraph_integer_t ndim,
         const igraph_vector_bool_t *is_fixed,
         igraph_real_t a,
-        igraph_real_t b
+        igraph_real_t b,
+        igraph_integer_t negative_sampling_rate
         ) {
 
     igraph_error_t errorcode;
@@ -600,7 +609,7 @@ igraph_error_t igraph_layout_treasuremap(
     /* Minimize cross-entropy between high-d and low-d probability
      * distributions */
     errorcode = igraph_i_umap_optimize_layout_stochastic_gradient(graph, &umap_weights, a, b,
-                res, epochs, sampling_prob, is_fixed);
+                res, epochs, sampling_prob, is_fixed, negative_sampling_rate);
     if(errorcode) {
         RNG_END();
         return errorcode;

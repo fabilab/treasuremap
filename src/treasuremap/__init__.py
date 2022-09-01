@@ -44,6 +44,9 @@ def _layout_treasuremap(
         sampling_prob=1.0,
         epochs=10,
         dim=2,
+        negative_sampling_rate=5,
+        a=-1,
+        b=-1,
     ):
 
     if min_dist < 0:
@@ -68,6 +71,10 @@ def _layout_treasuremap(
 
     if is_fixed is None:
         is_fixed = [False] * nvertices
+    # If all vertices are fixed, why are you calling this?
+    elif sum(is_fixed) == nvertices:
+        return [list(x) for x in seed]
+
     if len(is_fixed) != nvertices:
         raise ValueError("is_fixed must be a boolean vector of length n. vertices")
 
@@ -81,6 +88,8 @@ def _layout_treasuremap(
         nvertices, nedges,
         edges, dist, seed, is_fixed,
         min_dist, sampling_prob, epochs, dim,
+        negative_sampling_rate,
+        a, b,
     )
 
     return result
@@ -95,6 +104,8 @@ def treasuremap_adata(
         epochs=10,
         dim=2,
         copy=False,
+        negative_sampling_rate=5,
+        seed_nonfixed='closest_fixed',
     ):
     if AnnData is None:
         raise ImportError("Install the package anndata to use this function")
@@ -104,6 +115,7 @@ def treasuremap_adata(
     if 'distances' not in adata.obsp:
         raise KeyError("AnnData object must have an obsp['distances'] matrix")
     dist_matrix = adata.obsp['distances'].tocoo()
+    dist_matrix.sum_duplicates()
 
     edges = list(zip(dist_matrix.row, dist_matrix.col))
     dist = list(dist_matrix.data)
@@ -124,6 +136,20 @@ def treasuremap_adata(
             raise ValueError("{obsm_name} is {seed_dim}D, requested {dim}D embedding")
         seed = seed.tolist()
 
+        # If requested, seed free nodes with the coordinate of a fixed neighbor
+        if (seed_nonfixed == 'closest_fixed') and (is_fixed is not None) and any(is_fixed):
+            dist_matrix = dist_matrix.tocsr()
+            for coords, row, fix in zip(seed, dist_matrix, is_fixed):
+                if fix:
+                    continue
+                # If you're a free node, look for neighbors
+                for i in row.indices:
+                    # If a fixed neighbor is found, take its coordinates
+                    if is_fixed[i]:
+                        for j in range(len(coords)):
+                            coords[j] = seed[i][j]
+                        break
+
         if (seed_name in adata.uns) and ('params' in adata.uns[seed_name]):
             if 'a' in adata.uns[seed_name]['params']:
                 kwargs['a'] = adata.uns[seed_name]['params']['a']
@@ -141,6 +167,7 @@ def treasuremap_adata(
         sampling_prob,
         epochs,
         dim,
+        negative_sampling_rate=negative_sampling_rate,
         **kwargs,
     )
     result = np.asarray(result).astype(np.float32)
@@ -164,6 +191,7 @@ def treasuremap_igraph(
         sampling_prob=1.0,
         epochs=10,
         dim=2,
+        negative_sampling_rate=5,
     ):
 
     if Graph is None:
@@ -184,6 +212,7 @@ def treasuremap_igraph(
         sampling_prob,
         epochs,
         dim,
+        negative_sampling_rate=negative_sampling_rate,
     )
 
     # Recenter
