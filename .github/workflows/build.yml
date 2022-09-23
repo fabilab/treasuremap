@@ -221,7 +221,7 @@ jobs:
 
       - name: Test
         run: |
-          pip install numpy scipy pandas networkx pytest
+          pip install numpy scipy pandas igraph anndata pytest
           python -m pytest tests
 
       - uses: actions/upload-artifact@v2
