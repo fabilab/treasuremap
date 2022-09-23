@@ -21,7 +21,6 @@ import subprocess
 import sysconfig
 
 # Available at setup time due to pyproject.toml
-from pybind11 import get_cmake_dir
 from contextlib import contextmanager
 from pathlib import Path
 from select import select

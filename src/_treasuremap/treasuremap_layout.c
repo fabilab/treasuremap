@@ -220,7 +220,7 @@ static igraph_error_t igraph_i_umap_compute_cross_entropy(const igraph_t *graph,
 
         /* DEBUG PRINT */
         if ((nu < 0.001) || (1 - nu < 0.001)) {
-            if (0 < mu < 1) {
+            if ((mu > 0) && (mu < 1)) {
                 fprintf(stderr, "CE, nu for eid %ld: %g, sqd: %g, mu: %g\n", eid, nu, sqd, mu);
             }
         }
