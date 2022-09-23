@@ -12,7 +12,6 @@ if sys.version_info < (3, 6):
 
 ###########################################################################
 
-from pybind11.setup_helpers import Pybind11Extension, build_ext
 from setuptools import find_packages, setup, Command, Extension
 
 import glob
