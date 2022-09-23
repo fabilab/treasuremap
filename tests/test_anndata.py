@@ -2,10 +2,15 @@ import unittest
 from math import hypot
 import numpy as np
 import scipy as sp
-import anndata
+try:
+    import anndata
+except ImportError:
+    anndata = None
+
 from treasuremap import treasuremap_adata
 
 
+@unittest.skipIf(anndata is None, "test case depends on anndata")
 class TreasuremapTests(unittest.TestCase):
     def testEmpty(self):
         adata = anndata.AnnData()
