@@ -45,8 +45,8 @@ static igraph_error_t igraph_i_umap_find_sigma(const igraph_vector_t *distances,
             sum += exp(-(VECTOR(*distances)[eid] - rho) / sigma);
         }
 
-#ifdef UMAP_DEBUG
-        printf("SIGMA function (no_of_neis = %" IGRAPH_PRId ")- sum: %g, "
+#ifdef SIGMA_DEBUG
+        fprintf(stderr, "SIGMA function (no_of_neis = %" IGRAPH_PRId ")- sum: %g, "
                "target: %g, rho: %g, sigma: %g\n", no_of_neis, sum, target, rho, sigma);
 #endif
 
@@ -164,9 +164,9 @@ static igraph_error_t igraph_i_umap_find_prob_graph(const igraph_t *graph,
                 weight = weight + weight_inv - weight * weight_inv;
             }
 
-#ifdef UMAP_DEBUG
-            printf("distance: %g\n", VECTOR(*distances)[eid]);
-            printf("weight: %g\n", weight);
+#ifdef UMAP_VERBOSEDEBUG
+            fprintf(stderr, "distance: %g\n", VECTOR(*distances)[eid]);
+            fprintf(stderr, "weight: %g\n", weight);
 #endif
             VECTOR(*umap_weights)[eid] = weight;
             VECTOR(weight_seen)[eid] += 1;
@@ -213,14 +213,26 @@ static igraph_error_t igraph_i_umap_compute_cross_entropy(const igraph_t *graph,
         xd = (MATRIX(*layout, from, 0) - MATRIX(*layout, to, 0));
         yd = (MATRIX(*layout, from, 1) - MATRIX(*layout, to, 1));
         sqd = xd * xd + yd * yd;
+
         /* Find probability associated with distance using fitted Phi */
         /* NOT 2 * b since it's already squared */
         nu = 1.0 / (1 + a * pow(sqd, b));
 
+        /* DEBUG PRINT */
+        if ((nu < 0.001) || (1 - nu < 0.001)) {
+            if (0 < mu < 1) {
+                fprintf(stderr, "CE, nu for eid %ld: %g, sqd: %g, mu: %g\n", eid, nu, sqd, mu);
+            }
+        }
+
+        /* NOTE: we are in charge of corner cases where the log is trumped by the linear term */
         /* Term 1*/
-        *cross_entropy -= mu * log(nu);
+        if (mu > 0)
+            *cross_entropy -= mu * log(nu);
+
         /* Term 2*/
-        *cross_entropy -= (1 - mu) * log(1 - nu);
+        if (mu < 1)
+            *cross_entropy -= (1 - mu) * log(1 - nu);
 
         MATRIX(edge_seen, from, to) = MATRIX(edge_seen, to, from) = 1;
     }
@@ -286,8 +298,8 @@ static igraph_error_t igraph_i_umap_attract(
         /* clip force to avoid too rapid change */
         igraph_i_umap_clip_force(&(VECTOR(*forces)[d]), 3);
 
-#ifdef UMAP_DEBUG
-        printf("force attractive: delta[%ld] = %g, forces[%ld] = %g\n", d, VECTOR(*delta)[d], d, VECTOR(*forces)[d]);
+#ifdef FORCES_DEBUG
+        fprintf(stderr, "force attractive: delta[%ld] = %g, forces[%ld] = %g\n", d, VECTOR(*delta)[d], d, VECTOR(*forces)[d]);
 #endif
     }
 
@@ -318,8 +330,8 @@ static igraph_error_t igraph_i_umap_repel(
         /* clip force to avoid too rapid change */
         igraph_i_umap_clip_force(&(VECTOR(*forces)[d]), 3);
 
-#ifdef UMAP_DEBUG
-        printf("force repulsive: delta[%ld] = %g, forces[%ld] = %g\n", d, VECTOR(*delta)[d], d, VECTOR(*forces)[d]);
+#ifdef FORCES_DEBUG
+        fprintf(stderr, "force repulsive: delta[%ld] = %g, forces[%ld] = %g\n", d, VECTOR(*delta)[d], d, VECTOR(*forces)[d]);
 #endif
     }
 
@@ -513,7 +525,7 @@ static igraph_error_t igraph_i_umap_optimize_layout_stochastic_gradient(const ig
         cross_entropy_old = cross_entropy;
         igraph_i_umap_compute_cross_entropy(graph, umap_weights, layout, a, b, &cross_entropy);
 
-        printf("Cross-entropy before shift: %g, after shift: %g\n", cross_entropy_old, cross_entropy);
+        fprintf(stderr, "Cross-entropy before epoch: %g, after epoch: %g\n", cross_entropy_old, cross_entropy);
 #endif
 
          /* Adjust learning rate */

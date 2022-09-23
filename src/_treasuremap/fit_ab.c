@@ -144,8 +144,8 @@ igraph_error_t fit_ab(igraph_real_t min_dist, igraph_real_t *a_p, igraph_real_t 
         VECTOR(x)[i] = (end_point / nr_points) * i + 0.001; /* added a 0.001 to prevent NaNs */
     }
 
-#ifdef UMAP_DEBUG
-    printf("start fit_ab\n");
+#ifdef FITAB_DEBUG
+    fprintf(stderr, "start fit_ab\n");
 #endif
     for (igraph_integer_t iter = 0; iter < maxiter; iter++) {
         IGRAPH_CHECK(igraph_i_umap_get_ab_residuals(&residuals, &squared_sum_res, nr_points, a, b,
@@ -153,15 +153,15 @@ igraph_error_t fit_ab(igraph_real_t min_dist, igraph_real_t *a_p, igraph_real_t 
 
         /* break if good fit (conergence to truth) */
         if (squared_sum_res < tol * tol) {
-#ifdef UMAP_DEBUG
-            printf("convergence to zero (wow!)\n");
+#ifdef FITAB_DEBUG
+            fprintf(stderr, "convergence to zero (wow!)\n");
 #endif
             break;
         }
         /* break if no change (convergence) */
         if ((iter > 0) && fabs(sqrt(squared_sum_res_old) - sqrt(squared_sum_res)) < tol) {
-#ifdef UMAP_DEBUG
-            printf("no-change absolute convergence\n");
+#ifdef FITAB_DEBUG
+            fprintf(stderr, "no-change absolute convergence\n");
 #endif
             break;
         }
@@ -229,8 +229,8 @@ igraph_error_t fit_ab(igraph_real_t min_dist, igraph_real_t *a_p, igraph_real_t 
         IGRAPH_CHECK(igraph_i_umap_get_ab_residuals(&residuals, &squared_sum_res, nr_points, a + da,
                     b + db, &powb, &x, min_dist));
 
-#ifdef UMAP_DEBUG
-        printf("start line search, SSR before delta: %g, current SSR:, %g\n", squared_sum_res_old,
+#ifdef FITAB_DEBUG
+        fprintf(stderr, "start line search, SSR before delta: %g, current SSR:, %g\n", squared_sum_res_old,
                 squared_sum_res);
 #endif
         for (igraph_integer_t k = 0; k < 30; k++) {
@@ -242,8 +242,8 @@ igraph_error_t fit_ab(igraph_real_t min_dist, igraph_real_t *a_p, igraph_real_t 
                         a + da, b + db, &powb, &x, min_dist));
 
             /* Compare and if we are going back uphill, undo last step and break */
-#ifdef UMAP_DEBUG
-            printf("during line search, k = %ld, old SSR:, %g, new SSR (half a,b):, %g\n", k,
+#ifdef FITAB_DEBUG
+            fprintf(stderr, "during line search, k = %ld, old SSR:, %g, new SSR (half a,b):, %g\n", k,
                     squared_sum_res_tmp, squared_sum_res);
 #endif
             if (squared_sum_res > squared_sum_res_tmp - tol) {
@@ -252,8 +252,8 @@ igraph_error_t fit_ab(igraph_real_t min_dist, igraph_real_t *a_p, igraph_real_t 
                 break;
             }
         }
-#ifdef UMAP_DEBUG
-        printf("end of line search and iteration, squared_sum_res: %g \n\n", squared_sum_res_tmp);
+#ifdef FITAB_DEBUG
+        fprintf(stderr, "end of line search and iteration, squared_sum_res: %g \n\n", squared_sum_res_tmp);
 #endif
 
         /* assign a, b*/
@@ -271,8 +271,8 @@ igraph_error_t fit_ab(igraph_real_t min_dist, igraph_real_t *a_p, igraph_real_t 
     igraph_vector_destroy(&powb);
     IGRAPH_FINALLY_CLEAN(6);
 
-#ifdef UMAP_DEBUG
-    printf("a, b: %g %g\n", a, b);
+#ifdef FITAB_DEBUG
+    fprintf(stderr, "a, b: %g %g\n", a, b);
 #endif
 
     *a_p = a;

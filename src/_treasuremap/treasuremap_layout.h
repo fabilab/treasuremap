@@ -30,6 +30,9 @@
 
 #include <math.h>
 
+// FIXME
+#define UMAP_DEBUG
+
 /* NOTE: support also a spread? */
 igraph_error_t fit_ab(igraph_real_t min_dist, igraph_real_t *a_p, igraph_real_t *b_p);
 
