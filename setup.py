@@ -800,14 +800,7 @@ sources = [
 headers = ["src/_treasuremap/treasuremap_layout.h", "src/_treasuremap/convert.h"]
 headers = []
 
-# The main interface is through Pybind11Extension.
-# * You can add cxx_std=11/14/17, and then build_ext can be removed.
-# * You can set include_pybind11=false to add the include directory yourself,
-#   say from a submodule.
-#
-# Note:
-#   Sort input source files if you glob sources to ensure bit-for-bit
-#   reproducible builds (https://github.com/pybind/python_example/pull/53)
+# The low-level interface is through an Extension.
 treasuremap_extension = Extension(
     "treasuremap._treasuremap",
     sources,
@@ -841,7 +834,6 @@ options = dict(
     ),
     install_requires=[
         "texttable>=1.6.2",
-        "pybind11>=2.10.0",
         "numpy>=1.19.0; platform_python_implementation != 'PyPy'",
         ],
     extras_require={
