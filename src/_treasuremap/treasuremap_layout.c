@@ -403,13 +403,15 @@ static igraph_error_t igraph_i_umap_apply_forces(
         }
 
         /* Apply attractive force since they are neighbors */
-        IGRAPH_CHECK(igraph_i_umap_attract(&delta, VECTOR(*umap_weights)[eid], a, b, &forces));
+        IGRAPH_CHECK(igraph_i_umap_attract(&delta,
+                    VECTOR(*umap_weights)[eid], a, b, &forces));
         for (igraph_integer_t d = 0; d != ndim; d++) {
             MATRIX(*layout, from, d) += learning_rate * VECTOR(forces)[d];
         }
 
         /* Random other nodes are repelled from one (the first) vertex */
-        IGRAPH_CHECK(igraph_random_sample(&negative_vertices, 0, no_of_nodes - 2, n_negative_vertices));
+        IGRAPH_CHECK(igraph_random_sample(&negative_vertices,
+                    0, no_of_nodes - 2, n_negative_vertices));
         for (igraph_integer_t j = 0; j < n_negative_vertices; j++) {
             /* Get random neighbor */
             to = VECTOR(negative_vertices)[j];
@@ -517,7 +519,8 @@ static igraph_error_t igraph_i_umap_optimize_layout_stochastic_gradient(const ig
         // FIXME
         fprintf(stderr, "Epoch %ld / %ld\n", e+1, epochs);
         /* Apply (stochastic) forces */
-        igraph_i_umap_apply_forces(graph, umap_weights, layout, a, b, sampling_prob, learning_rate,
+        igraph_i_umap_apply_forces(graph,
+                umap_weights, layout, a, b, sampling_prob, learning_rate,
                 avoid_neighbor_repulsion, is_fixed, negative_sampling_rate);
 
 #ifdef UMAP_DEBUG
@@ -620,8 +623,9 @@ igraph_error_t igraph_layout_treasuremap(
 
     /* Minimize cross-entropy between high-d and low-d probability
      * distributions */
-    errorcode = igraph_i_umap_optimize_layout_stochastic_gradient(graph, &umap_weights, a, b,
-                res, epochs, sampling_prob, is_fixed, negative_sampling_rate);
+    errorcode = igraph_i_umap_optimize_layout_stochastic_gradient(graph,
+            &umap_weights, a, b,
+            res, epochs, sampling_prob, is_fixed, negative_sampling_rate);
     if(errorcode) {
         RNG_END();
         return errorcode;

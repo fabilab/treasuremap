@@ -53,8 +53,8 @@ def _layout_treasuremap(
     if min_dist < 0:
         raise ValueError(f"Minimum distance must be positive, got {min_dist}")
 
-    if epochs < 0:
-        raise ValueError(f"Number of epochs must be non-negative, got {min_dist}")
+    if epochs < 1:
+        raise ValueError(f"Number of epochs must be positive, got {epochs}")
 
     if (sampling_prob <= 0) or (sampling_prob > 1):
         raise ValueError(f"Sampling probability must be in (0, 1], for {sampling_prob}")
@@ -107,6 +107,7 @@ def treasuremap_adata(
         copy=False,
         negative_sampling_rate=5,
         seed_nonfixed='closest_fixed',
+        recenter_layout=False,
     ):
     if AnnData is None:
         raise ImportError("Install the package anndata to use this function")
@@ -137,19 +138,57 @@ def treasuremap_adata(
             raise ValueError("{obsm_name} is {seed_dim}D, requested {dim}D embedding")
         seed = seed.tolist()
 
+        # FIXME
+        adata.obs['no_fixed_neighbor'] = False
+
         # If requested, seed free nodes with the coordinate of a fixed neighbor
+        # We introduce a little noise to avoid exact overlapping
         if (seed_nonfixed == 'closest_fixed') and (is_fixed is not None) and any(is_fixed):
             dist_matrix = dist_matrix.tocsr()
-            for coords, row, fix in zip(seed, dist_matrix, is_fixed):
+            no_fixed_nei = []
+            for k, (coords, row, fix) in enumerate(zip(seed, dist_matrix, is_fixed)):
+                # If you're a fixed node, you already have fixed coords
                 if fix:
                     continue
-                # If you're a free node, look for neighbors
+                # If you're a free node, look for neighbors that are fixed
                 for i in row.indices:
                     # If a fixed neighbor is found, take its coordinates
                     if is_fixed[i]:
                         for j in range(len(coords)):
-                            coords[j] = seed[i][j]
+                            coords[j] = seed[i][j] + 0.01 * np.random.rand()
                         break
+                else:
+                    # No fixed neighbor, accumulate and seed at the end
+                    no_fixed_nei.append(k)
+
+            if len(no_fixed_nei):
+                nn = len(no_fixed_nei)
+                print(f'{nn} cells have no fixed neighbors')
+
+            # FIXME
+            adata.obs['no_fixed_neighbor'] = False
+            adata.obs['no_fixed_neighbor'].iloc[no_fixed_nei] = True
+
+            while no_fixed_nei:
+                k = no_fixed_nei[0]
+                row = dist_matrix[k]
+                coords = seed[k]
+                for i in row.indices:
+                    # This neighbor also has no fixed neighbors, look for a
+                    # better neighbor if available
+                    if i in no_fixed_nei:
+                        continue
+                    # This neighbor has fixed neighbors, so it got assigned a
+                    # coordinate already, copy it over
+                    for j in range(len(coords)):
+                        coords[j] = seed[i][j] + 0.01 * np.random.rand()
+                    break
+                else:
+                    # All neighbors are also without a neighbor, use a totaly
+                    # random starting position
+                    for j in range(len(coords)):
+                        coords[j] = 15.0 * np.random.rand()
+                del no_fixed_nei[0]
 
         if (seed_name in adata.uns) and ('params' in adata.uns[seed_name]):
             if 'a' in adata.uns[seed_name]['params']:
@@ -173,8 +212,7 @@ def treasuremap_adata(
     )
     result = np.asarray(result).astype(np.float32)
 
-    # Recenter
-    if len(result):
+    if recenter_layout and len(result):
         result -= result.mean(axis=0)
 
     if copy:
