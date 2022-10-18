@@ -11,6 +11,7 @@ except ImportError:
     np = None
 
 import treasuremap._treasuremap as _treasuremap
+from treasuremap.compress_atlas import subsample_atlas
 
 
 def _recenter(result):
@@ -326,3 +327,11 @@ class ModelWithNorthstar:
         else:
             for col in columns:
                 self.result[col] = result[col]
+
+
+__all__ = (
+    'treasuremap_igraph',
+    'treasuremap_adata',
+    'ModelWithNorthstar',
+    'subsample_atlas',
+)

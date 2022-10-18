@@ -816,17 +816,14 @@ options = dict(
     author_email="fabio.zanini@unsw.edu.au",
     url="https://github.com/iosonofabio/treasuremap",
     project_urls={
-        "Bug Tracker": "https://github.com/igraph/python-igraph/issues",
-        "Changelog": "https://github.com/igraph/python-igraph/blob/master/CHANGELOG.md",
-        "CI": "https://github.com/igraph/python-igraph/actions",
-        "Documentation": "https://igraph.org/python/doc",
-        "Source Code": "https://github.com/igraph/python-igraph",
+        "Bug Tracker": "https://github.com/iosonofabio/treasureap/issues",
+        "Changelog": "https://github.com/iosonofabio/treasuremap/blob/master/CHANGELOG.md",
+        "CI": "https://github.com/iosonofabio/treasuremap/actions",
+        "Documentation": "https://treasuremap.readthedocs.io",
+        "Source Code": "https://github.com/iosonofabio/treasuremap",
     },
     ext_modules=[treasuremap_extension],
     package_dir={
-        # make sure to use the next line and not the more logical and restrictive
-        # "igraph": "src/igraph" because that one breaks 'setup.py develop'.
-        # See: https://github.com/igraph/python-igraph/issues/464
         "": "src"
     },
     packages=find_packages(
@@ -860,12 +857,12 @@ options = dict(
     headers=headers,
     platforms="ALL",
     keywords=[
+        "cell biology",
+        "bioinformatics",
+        "cell atlases",
+        "single cell",
         "graph",
         "network",
-        "mathematics",
-        "math",
-        "graph theory",
-        "discrete mathematics",
     ],
     classifiers=[
         "Development Status :: 4 - Beta",
