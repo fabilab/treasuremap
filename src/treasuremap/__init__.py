@@ -48,6 +48,7 @@ def _layout_treasuremap(
         negative_sampling_rate=5,
         a=-1,
         b=-1,
+        distances_are_connectivities=False,
     ):
 
     if min_dist < 0:
@@ -91,6 +92,7 @@ def _layout_treasuremap(
         min_dist, sampling_prob, epochs, dim,
         negative_sampling_rate,
         a, b,
+        distances_are_connectivities,
     )
 
     return result

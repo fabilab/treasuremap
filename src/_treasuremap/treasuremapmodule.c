@@ -47,11 +47,12 @@ static PyObject* treasuremapmodule_fit_ab(PyObject *self, PyObject *args, PyObje
 
 static PyObject* treasuremapmodule_treasuremap(PyObject *self, PyObject *args, PyObject * kwds) {
 
-    static char *kwlist[] = { "nvertices", "nedges", "edges", "dist", "seed", "is_fixed", "min_dist", "sampling_prob", "epochs", "dim", "negative_sampling_rate", "a", "b", NULL };
+    static char *kwlist[] = { "nvertices", "nedges", "edges", "dist", "seed", "is_fixed", "min_dist", "sampling_prob", "epochs", "dim", "negative_sampling_rate", "a", "b", "distances_are_connectivities", NULL };
     long nedges, nvertices;
     PyObject *edges_o, *dist_o, *seed_o = Py_None, *is_fixed_o;
     double min_dist, sampling_probability;
     long epochs, ndim, negative_sampling_rate = 5;
+    int distances_are_connectivities;
     PyObject *output;
     bool use_seed = false;
     double a = -1, b = -1;
@@ -64,11 +65,13 @@ static PyObject* treasuremapmodule_treasuremap(PyObject *self, PyObject *args, P
     igraph_matrix_t igraph_res;
 
     /* Parse arguments */
-    if(!PyArg_ParseTupleAndKeywords(args, kwds, "llOOOOddll|ldd", kwlist,
+    if(!PyArg_ParseTupleAndKeywords(args, kwds, "llOOOOddll|lddp", kwlist,
                                     &nvertices, &nedges,
                                     &edges_o, &dist_o, &seed_o, &is_fixed_o,
                                     &min_dist, &sampling_probability,
-                                    &epochs, &ndim, &negative_sampling_rate, &a, &b))
+                                    &epochs, &ndim, &negative_sampling_rate, &a, &b,
+                                    &distances_are_connectivities
+                                    ))
         return NULL;
 
     if (igraphmodule_PyObject_to_vector_bool_t(is_fixed_o, &igraph_is_fixed))
@@ -140,7 +143,9 @@ static PyObject* treasuremapmodule_treasuremap(PyObject *self, PyObject *args, P
             &igraph_is_fixed,
             a,
             b,
-            negative_sampling_rate);
+            negative_sampling_rate,
+            distances_are_connectivities
+            );
 
     // Destroy intermediate data structures
     igraph_destroy(&igraph_graph);

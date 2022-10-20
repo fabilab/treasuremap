@@ -50,7 +50,8 @@ igraph_error_t igraph_layout_treasuremap(
         const igraph_vector_bool_t *is_fixed,
         igraph_real_t a,
         igraph_real_t b,
-        igraph_integer_t negative_sampling_rate
+        igraph_integer_t negative_sampling_rate,
+        int distances_are_connectivities
         );
 
 #endif
