@@ -600,8 +600,9 @@ static igraph_error_t igraph_i_umap_optimize_layout_stochastic_gradient(
 #endif
 
     for (igraph_integer_t e = 0; e < epochs; e++) {
-        // FIXME
+#ifdef UMAP_DEBUG
         fprintf(stderr, "Epoch %ld / %ld\n", e+1, epochs);
+#endif
 
         /* Apply (stochastic) forces */
         igraph_i_umap_apply_forces(graph,
