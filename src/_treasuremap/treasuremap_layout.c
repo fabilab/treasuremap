@@ -236,7 +236,6 @@ static igraph_error_t igraph_i_umap_make_epochs_per_edge(
 
 
 /* cross-entropy */
-#ifdef UMAP_DEBUG
 igraph_error_t igraph_umap_compute_cross_entropy(
         const igraph_t *graph,
         const igraph_vector_t *umap_weights,
@@ -320,7 +319,6 @@ igraph_error_t igraph_umap_compute_cross_entropy(
 
     return IGRAPH_SUCCESS;
 }
-#endif /* UMAP_DEBUG */
 
 
 /* clip forces to avoid too rapid shifts */
@@ -370,7 +368,7 @@ static igraph_error_t igraph_i_umap_attract(
 
 /*xd is difference in x direction, mu is a weight */
 static igraph_error_t igraph_i_umap_repel(
-        igraph_vector_t *delta, igraph_real_t mu,
+        igraph_vector_t *delta,
         igraph_real_t min_dist,
         igraph_real_t a, igraph_real_t b, igraph_vector_t *forces
         )
@@ -386,7 +384,7 @@ static igraph_error_t igraph_i_umap_repel(
     /* NOTE: in practice, in negative sampling mu is always zero because we
      * *assume* the sample to be negative i.e. never a true edge */
     dsq_min = CORRECT_DISTANCE_REPULSION * CORRECT_DISTANCE_REPULSION;
-    force = (1 - mu) * (2 * b) / (dsq_min + dsq) / (1. + a * pow(dsq, b));
+    force = (2 * b) / (dsq_min + dsq) / (1. + a * pow(dsq, b));
     for (igraph_integer_t d = 0; d != ndim; d++) {
         VECTOR(*forces)[d] = force * VECTOR(*delta)[d];
 
@@ -447,13 +445,9 @@ static igraph_error_t igraph_i_umap_apply_forces(
         /* set next epoch at which this edge will be sampled */
         VECTOR(*next_epoch_sample_per_edge)[eid] += VECTOR(*epochs_per_edge)[eid];
 
-        /* FIXME: Adjust so that the rest is always picked */
-        //if (RNG_UNIF01() > prob) {
-        //    continue;
-        //}
-
-        /* TODO: when the time of this edge comes, do we move both nodes at the same time?
-         * or do we randomize the order of edges each epoch? */
+        /* we move all vertices on one end of the edges, then we come back for
+         * the vertices on the other end. This way we don't move both ends at the
+         * same time, which is almost a wasted move since they attract each other */
         int swapflag = (int)(RNG_UNIF01() > 0.5);
         int swapflag_end = swapflag + 2;
         for (; swapflag < swapflag_end; swapflag++) {
@@ -536,7 +530,7 @@ static igraph_error_t igraph_i_umap_apply_forces(
 
                 /* This repels the other vertex assuming it's a negative example
                  * that is no weight, no edge */
-                IGRAPH_CHECK(igraph_i_umap_repel(&delta, 0, min_dist, a, b, &forces));
+                IGRAPH_CHECK(igraph_i_umap_repel(&delta, min_dist, a, b, &forces));
                 /* The repulsive force is already *away* from the other (non-neighbor) vertex */
                 for (igraph_integer_t d = 0; d != ndim; d++) {
                     MATRIX(*layout, from, d) += learning_rate * VECTOR(forces)[d];

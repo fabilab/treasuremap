@@ -30,8 +30,7 @@
 
 #include <math.h>
 
-// FIXME
-#define UMAP_DEBUG
+//#define UMAP_DEBUG
 
 #define FORCE_LIMIT 4
 #define MIN_DISTANCE_ATTRACTION 0.0001
@@ -58,7 +57,6 @@ igraph_error_t igraph_layout_treasuremap(
         int distances_are_connectivities
         );
 
-#ifdef UMAP_DEBUG
 igraph_error_t igraph_umap_compute_cross_entropy(
         const igraph_t *graph,
         const igraph_vector_t *umap_weights,
@@ -66,6 +64,5 @@ igraph_error_t igraph_umap_compute_cross_entropy(
         igraph_real_t a, igraph_real_t b,
         igraph_real_t *cross_entropy
         );
-#endif
 
 #endif
