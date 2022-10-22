@@ -169,14 +169,6 @@ def treasuremap_adata(
                     # No fixed neighbor, accumulate and seed at the end
                     no_fixed_nei.append(k)
 
-            if len(no_fixed_nei):
-                nn = len(no_fixed_nei)
-                print(f'{nn} cells have no fixed neighbors')
-
-            # FIXME
-            adata.obs['no_fixed_neighbor'] = False
-            adata.obs['no_fixed_neighbor'].iloc[no_fixed_nei] = True
-
             while no_fixed_nei:
                 k = no_fixed_nei[0]
                 row = dist_matrix[k]
