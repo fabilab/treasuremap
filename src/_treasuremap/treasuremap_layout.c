@@ -351,7 +351,7 @@ static igraph_real_t igraph_i_umap_repel(
 
 static igraph_error_t igraph_i_umap_apply_forces(
         const igraph_t *graph,  const igraph_vector_t *umap_weights,
-        igraph_matrix_t *layout, igraph_real_t a, igraph_real_t b, igraph_real_t prob,
+        igraph_matrix_t *layout, igraph_real_t a, igraph_real_t b,
         igraph_real_t learning_rate, igraph_bool_t avoid_neighbor_repulsion,
         const igraph_vector_bool_t *is_fixed,
         igraph_integer_t negative_sampling_rate,
@@ -383,9 +383,7 @@ static igraph_error_t igraph_i_umap_apply_forces(
     }
     IGRAPH_VECTOR_INT_INIT_FINALLY(&negative_vertices, 0);
 
-    /* iterate over a random subsample of edges. We have an igraph_random_sample() function to
-     * do that, but that one would require the allocation of a separate vector and we don't
-     * need that, especially if `prob` is high */
+    /* Iterate over edges. Stronger edges are sampled more often */
     for (igraph_integer_t eid = 0; eid < no_of_edges; eid++) {
         /* We sample all and only edges that are supposed to be moved at this time */
         if ((VECTOR(*next_epoch_sample_per_edge)[eid] - epoch) >= 1) {
@@ -533,7 +531,7 @@ static igraph_error_t igraph_i_umap_apply_forces(
 static igraph_error_t igraph_i_umap_optimize_layout_stochastic_gradient(
         const igraph_t *graph,
        const igraph_vector_t *umap_weights, igraph_real_t a, igraph_real_t b,
-       igraph_matrix_t *layout, igraph_integer_t epochs, igraph_real_t sampling_prob,
+       igraph_matrix_t *layout, igraph_integer_t epochs,
        const igraph_vector_bool_t *is_fixed, igraph_integer_t negative_sampling_rate,
        igraph_real_t min_dist,
        const igraph_vector_t *epochs_per_edge) {
@@ -580,7 +578,7 @@ static igraph_error_t igraph_i_umap_optimize_layout_stochastic_gradient(
 
         /* Apply (stochastic) forces */
         igraph_i_umap_apply_forces(graph,
-                umap_weights, layout, a, b, sampling_prob, learning_rate,
+                umap_weights, layout, a, b, learning_rate,
                 avoid_neighbor_repulsion, is_fixed, negative_sampling_rate,
                 min_dist,
                 e,
@@ -652,7 +650,6 @@ igraph_error_t igraph_layout_treasuremap(
         const igraph_vector_t *distances,
         igraph_real_t min_dist,
         igraph_integer_t epochs,
-        igraph_real_t sampling_prob,
         igraph_integer_t ndim,
         const igraph_vector_bool_t *is_fixed,
         igraph_real_t a,
@@ -709,7 +706,7 @@ igraph_error_t igraph_layout_treasuremap(
      * distributions */
     errorcode = igraph_i_umap_optimize_layout_stochastic_gradient(graph,
             &umap_weights, a, b,
-            res, epochs, sampling_prob, is_fixed, negative_sampling_rate,
+            res, epochs, is_fixed, negative_sampling_rate,
             min_dist,
             &epochs_per_edge);
     if(errorcode) {

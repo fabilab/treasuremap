@@ -48,7 +48,6 @@ igraph_error_t igraph_layout_treasuremap(
         const igraph_vector_t *distances,
         igraph_real_t min_dist,
         igraph_integer_t epochs,
-        igraph_real_t sampling_prob,
         igraph_integer_t ndim,
         const igraph_vector_bool_t *is_fixed,
         igraph_real_t a,

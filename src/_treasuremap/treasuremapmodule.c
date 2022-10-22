@@ -118,10 +118,10 @@ static PyObject* treasuremapmodule_compute_crossentropy(
 
 static PyObject* treasuremapmodule_treasuremap(PyObject *self, PyObject *args, PyObject * kwds) {
 
-    static char *kwlist[] = { "nvertices", "nedges", "edges", "dist", "seed", "is_fixed", "min_dist", "sampling_prob", "epochs", "dim", "negative_sampling_rate", "a", "b", "distances_are_connectivities", NULL };
+    static char *kwlist[] = { "nvertices", "nedges", "edges", "dist", "seed", "is_fixed", "min_dist", "epochs", "dim", "negative_sampling_rate", "a", "b", "distances_are_connectivities", NULL };
     long nedges, nvertices;
     PyObject *edges_o, *dist_o, *seed_o = Py_None, *is_fixed_o;
-    double min_dist, sampling_probability;
+    double min_dist;
     long epochs, ndim, negative_sampling_rate = 5;
     int distances_are_connectivities;
     PyObject *output;
@@ -136,10 +136,10 @@ static PyObject* treasuremapmodule_treasuremap(PyObject *self, PyObject *args, P
     igraph_matrix_t igraph_res;
 
     /* Parse arguments */
-    if(!PyArg_ParseTupleAndKeywords(args, kwds, "llOOOOddll|lddp", kwlist,
+    if(!PyArg_ParseTupleAndKeywords(args, kwds, "llOOOOdll|lddp", kwlist,
                                     &nvertices, &nedges,
                                     &edges_o, &dist_o, &seed_o, &is_fixed_o,
-                                    &min_dist, &sampling_probability,
+                                    &min_dist,
                                     &epochs, &ndim, &negative_sampling_rate, &a, &b,
                                     &distances_are_connectivities
                                     ))
@@ -209,7 +209,6 @@ static PyObject* treasuremapmodule_treasuremap(PyObject *self, PyObject *args, P
             &igraph_distances,
             min_dist,
             epochs,
-            sampling_probability,
             (int) ndim,
             &igraph_is_fixed,
             a,

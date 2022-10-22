@@ -42,10 +42,9 @@ def _layout_treasuremap(
         seed=None,
         is_fixed=None,
         min_dist=0.01,
-        sampling_prob=1.0,
         epochs=10,
         dim=2,
-        negative_sampling_rate=5,
+        negative_sampling_rate=4,
         a=-1,
         b=-1,
         distances_are_connectivities=False,
@@ -56,9 +55,6 @@ def _layout_treasuremap(
 
     if epochs < 0:
         raise ValueError(f"Number of epochs must be nonnegative, got {epochs}")
-
-    if (sampling_prob <= 0) or (sampling_prob > 1):
-        raise ValueError(f"Sampling probability must be in (0, 1], for {sampling_prob}")
 
     if dim not in (2, 3):
         raise ValueError(f"Number of dimensions must be 2 or 3, for {dim}")
@@ -89,7 +85,7 @@ def _layout_treasuremap(
     result = _treasuremap.layout_treasuremap(
         nvertices, nedges,
         edges, dist, seed, is_fixed,
-        min_dist, sampling_prob, epochs, dim,
+        min_dist, epochs, dim,
         negative_sampling_rate,
         a, b,
         distances_are_connectivities,
@@ -103,11 +99,10 @@ def treasuremap_adata(
         seed_name='umap',
         is_fixed=None,
         min_dist=0.01,
-        sampling_prob=1.0,
         epochs=10,
         dim=2,
         copy=False,
-        negative_sampling_rate=5,
+        negative_sampling_rate=4,
         seed_nonfixed='closest_fixed',
         recenter_layout=False,
         use_connectivities=False,
@@ -204,7 +199,6 @@ def treasuremap_adata(
         seed,
         is_fixed,
         min_dist,
-        sampling_prob,
         epochs,
         dim,
         negative_sampling_rate=negative_sampling_rate,
@@ -228,7 +222,6 @@ def treasuremap_igraph(
         seed=None,
         is_fixed=None,
         min_dist=0.01,
-        sampling_prob=1.0,
         epochs=10,
         dim=2,
         negative_sampling_rate=5,
@@ -249,7 +242,6 @@ def treasuremap_igraph(
         seed,
         is_fixed,
         min_dist,
-        sampling_prob,
         epochs,
         dim,
         negative_sampling_rate=negative_sampling_rate,
@@ -309,7 +301,6 @@ class ModelWithNorthstar:
             self,
             seed_name='umap',
             min_dist=0.01,
-            sampling_prob=1.0,
             epochs=10,
         ):
         import pandas as pd
@@ -350,7 +341,6 @@ class ModelWithNorthstar:
             seed=seed,
             is_fixed=is_fixed,
             min_dist=min_dist,
-            sampling_prob=sampling_prob,
             epochs=epochs,
             dim=dim,
         )
