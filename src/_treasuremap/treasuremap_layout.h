@@ -33,6 +33,10 @@
 // FIXME
 #define UMAP_DEBUG
 
+#define FORCE_LIMIT 4
+#define MIN_DISTANCE_ATTRACTION 0.0001
+#define CORRECT_DISTANCE_REPULSION 0.01
+
 /* NOTE: support also a spread? */
 igraph_error_t fit_ab(igraph_real_t min_dist, igraph_real_t *a_p, igraph_real_t *b_p);
 
@@ -53,5 +57,15 @@ igraph_error_t igraph_layout_treasuremap(
         igraph_integer_t negative_sampling_rate,
         int distances_are_connectivities
         );
+
+#ifdef UMAP_DEBUG
+igraph_error_t igraph_umap_compute_cross_entropy(
+        const igraph_t *graph,
+        const igraph_vector_t *umap_weights,
+        const igraph_matrix_t *layout,
+        igraph_real_t a, igraph_real_t b,
+        igraph_real_t *cross_entropy
+        );
+#endif
 
 #endif

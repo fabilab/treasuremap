@@ -45,6 +45,77 @@ static PyObject* treasuremapmodule_fit_ab(PyObject *self, PyObject *args, PyObje
 }
 
 
+static PyObject* treasuremapmodule_compute_crossentropy(
+        PyObject *self, PyObject *args, PyObject *kwds) {
+
+    static char *kwlist[] = { "edges", "weights", "layout", "a", "b", NULL };
+    PyObject *edges_o, *layout_o, *weights_o;
+    double a, b;
+
+    igraph_error_t return_code = 0;
+    igraph_vector_int_t igraph_edges;
+    igraph_t igraph_graph;
+    igraph_matrix_t igraph_layout;
+    igraph_vector_t igraph_weights;
+    igraph_real_t cross_entropy;
+    igraph_integer_t nvertices;
+
+    /* Parse arguments */
+    if(!PyArg_ParseTupleAndKeywords(args, kwds, "OOOdd", kwlist,
+                                    &edges_o, &weights_o, &layout_o, &a, &b))
+        return NULL;
+
+    // weights
+    if (igraphmodule_PyObject_float_to_vector_t(weights_o, &igraph_weights)) {
+        return NULL;
+    }
+
+    // layout
+    if (igraphmodule_PyList_to_matrix_t(layout_o, &igraph_layout)) {
+        igraph_vector_destroy(&igraph_weights);
+        return NULL;
+    }
+    nvertices = igraph_matrix_size(&igraph_layout) / 2;
+
+    // edgelist (already flattened)
+    if (igraphmodule_PyObject_to_edgelist(edges_o, &igraph_edges)) {
+        igraph_vector_destroy(&igraph_weights);
+        igraph_matrix_destroy(&igraph_layout);
+        return NULL;
+    }
+
+    // Initialize graph
+    if (igraph_create(&igraph_graph, &igraph_edges, nvertices, false)) {
+        igraph_vector_destroy(&igraph_weights);
+        igraph_matrix_destroy(&igraph_layout);
+        igraph_vector_int_destroy(&igraph_edges);
+        return NULL;
+    }
+    igraph_vector_int_destroy(&igraph_edges);
+
+    igraph_umap_compute_cross_entropy(
+        &igraph_graph,
+        &igraph_weights,
+        &igraph_layout,
+        (igraph_real_t) a,
+        (igraph_real_t) b,
+        &cross_entropy
+    );
+
+    // Destroy intermediate data structures
+    igraph_destroy(&igraph_graph);
+    igraph_matrix_destroy(&igraph_layout);
+    igraph_vector_destroy(&igraph_weights);
+
+    if (return_code != IGRAPH_SUCCESS) {
+        return NULL;
+    }
+
+    return PyFloat_FromDouble((double) cross_entropy);
+
+}
+
+
 static PyObject* treasuremapmodule_treasuremap(PyObject *self, PyObject *args, PyObject * kwds) {
 
     static char *kwlist[] = { "nvertices", "nedges", "edges", "dist", "seed", "is_fixed", "min_dist", "sampling_prob", "epochs", "dim", "negative_sampling_rate", "a", "b", "distances_are_connectivities", NULL };
@@ -181,6 +252,7 @@ static igraph_error_t treasuremapmodule_igraph_interrupt_hook(void* data) {
 static PyMethodDef treasuremapmodule_methods[] = {
     {"layout_treasuremap", (PyCFunction) treasuremapmodule_treasuremap, METH_VARARGS | METH_KEYWORDS, "Run the C-level treasuremap function"},
     {"fit_ab", (PyCFunction) treasuremapmodule_fit_ab, METH_VARARGS | METH_KEYWORDS, "Fit a and b parameters from min_dist"},
+    {"compute_crossentropy", (PyCFunction) treasuremapmodule_compute_crossentropy, METH_VARARGS | METH_KEYWORDS, "Compute cross-entropy"},
     {NULL, NULL, 0, NULL}
 };
 

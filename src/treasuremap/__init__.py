@@ -54,8 +54,8 @@ def _layout_treasuremap(
     if min_dist < 0:
         raise ValueError(f"Minimum distance must be positive, got {min_dist}")
 
-    if epochs < 1:
-        raise ValueError(f"Number of epochs must be positive, got {epochs}")
+    if epochs < 0:
+        raise ValueError(f"Number of epochs must be nonnegative, got {epochs}")
 
     if (sampling_prob <= 0) or (sampling_prob > 1):
         raise ValueError(f"Sampling probability must be in (0, 1], for {sampling_prob}")
@@ -110,16 +110,22 @@ def treasuremap_adata(
         negative_sampling_rate=5,
         seed_nonfixed='closest_fixed',
         recenter_layout=False,
+        use_connectivities=False,
     ):
     if AnnData is None:
         raise ImportError("Install the package anndata to use this function")
 
     nvertices = adata.shape[0]
 
-    if 'distances' not in adata.obsp:
-        raise KeyError("AnnData object must have an obsp['distances'] matrix")
-    dist_matrix = adata.obsp['distances'].tocoo()
-    dist_matrix.sum_duplicates()
+    if not use_connectivities:
+        if 'distances' not in adata.obsp:
+            raise KeyError("AnnData object must have an obsp['distances'] matrix")
+        dist_matrix = adata.obsp['distances'].tocoo()
+        dist_matrix.sum_duplicates()
+    else:
+        if 'connectivities' not in adata.obsp:
+            raise KeyError("AnnData object must have an obsp['connectivities'] matrix")
+        dist_matrix = adata.obsp['connectivities'].tocoo()
 
     edges = list(zip(dist_matrix.row, dist_matrix.col))
     dist = list(dist_matrix.data)
@@ -196,7 +202,7 @@ def treasuremap_adata(
             if 'a' in adata.uns[seed_name]['params']:
                 kwargs['a'] = adata.uns[seed_name]['params']['a']
             if 'b' in adata.uns[seed_name]['params']:
-                kwargs['b'] = adata.uns[seed_name]['params']['a']
+                kwargs['b'] = adata.uns[seed_name]['params']['b']
 
     result = _layout_treasuremap(
         nvertices,
@@ -210,6 +216,7 @@ def treasuremap_adata(
         epochs,
         dim,
         negative_sampling_rate=negative_sampling_rate,
+        distances_are_connectivities=use_connectivities,
         **kwargs,
     )
     result = np.asarray(result).astype(np.float32)
