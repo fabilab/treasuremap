@@ -59,6 +59,9 @@ def _layout_treasuremap(
     if dim not in (2, 3):
         raise ValueError(f"Number of dimensions must be 2 or 3, for {dim}")
 
+    if negative_sampling_rate < 0:
+        raise ValueError(f"Negative sampling rate must be nonnegative, got {negative_sampling_rate}")
+
     if nvertices == 0:
         return Layout([])
     if nvertices == 1:

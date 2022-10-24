@@ -80,11 +80,11 @@ static igraph_error_t igraph_i_umap_find_sigma(const igraph_vector_t *distances,
 }
 
 
-/* Convert the graph with distances into a probability graph with exponential decay
+/* Convert the graph with distances into a probability graph with exponential decay.
  * The original UMAP implementation calls these probabilities "membership strengths"
  * and computes them in a separate function. Here, we have a single function computing
- * the sigmas (scale factors) and rhos (minimal distance or connectivity correction)
- * and also the probability graph in one go. */
+ * the sigmas (scale factors), rhos (minimal distance or connectivity correction)
+ * and the probability graph in one go. */
 static igraph_error_t igraph_i_umap_find_prob_graph(const igraph_t *graph,
         const igraph_vector_t *distances, igraph_vector_t *umap_weights) {
 
@@ -110,7 +110,7 @@ static igraph_error_t igraph_i_umap_find_prob_graph(const igraph_t *graph,
     /* Iterate over vertices x, like in the paper */
     for (igraph_integer_t i = 0; i < no_of_nodes; i++) {
         /* Edges into this vertex */
-        igraph_incident(graph, &eids, i, IGRAPH_ALL);
+        IGRAPH_CHECK(igraph_incident(graph, &eids, i, IGRAPH_ALL));
         no_of_neis = igraph_vector_int_size(&eids);
 
         /* Vertex has no neighbors */
@@ -199,40 +199,6 @@ static igraph_error_t igraph_i_copy_prob_graph(const igraph_t *graph,
     return IGRAPH_SUCCESS;
 }
 
-
-/* Edges with heavier weight/higher probability should be sampled more often. In
- * other words, vertices at each end of those edges should be moved more often,
- * up to each iteration/epoch. Conversely, vertices at the end of weak edges can
- * be moved only once in a while.
- *
- * NOTE: epochs_per_edge is a real to have a better approximation when we compute
- * if the time for sampling has actually arrived without actually have to store
- * all sampling times for all edges.
- * */
-static igraph_error_t igraph_i_umap_make_epochs_per_edge(
-        const igraph_vector_t *umap_weights,
-        igraph_integer_t no_of_edges,
-        igraph_integer_t epochs,
-        igraph_vector_t *epochs_per_edge) {
-
-    /* NOTE: I think for this implementation this is just one, corresponding to
-     * a distance of rho */
-    igraph_real_t max_weight = 1.0;
-    igraph_real_t weight;
-
-    for (igraph_integer_t j = 0; j < no_of_edges; j++) {
-        /* If the weight is zero, it cannot attract anyway so we can skip it
-         * throughout the optimization */
-        weight = VECTOR(*umap_weights)[j];
-        if (weight > 0) {
-            VECTOR(*epochs_per_edge)[j] = epochs * weight / max_weight;
-        } else {
-            VECTOR(*epochs_per_edge)[j] = -1;
-        }
-    }
-    return IGRAPH_SUCCESS;
-
-}
 
 
 /* cross-entropy */
@@ -343,21 +309,24 @@ static igraph_real_t igraph_i_umap_repel(
         igraph_real_t a,
         igraph_real_t b)
 {
+    igraph_real_t dsq_min = CORRECT_DISTANCE_REPULSION * CORRECT_DISTANCE_REPULSION;
     /* NOTE: in practice, in negative sampling mu is always zero because we
      * *assume* the sample to be negative i.e. never a true edge */
-    igraph_real_t dsq_min = CORRECT_DISTANCE_REPULSION * CORRECT_DISTANCE_REPULSION;
     return (2 * b) / (dsq_min + dsq) / (1. + a * pow(dsq, b));
 }
 
 static igraph_error_t igraph_i_umap_apply_forces(
-        const igraph_t *graph,  const igraph_vector_t *umap_weights,
-        igraph_matrix_t *layout, igraph_real_t a, igraph_real_t b,
-        igraph_real_t learning_rate, igraph_bool_t avoid_neighbor_repulsion,
+        const igraph_t *graph,
+        const igraph_vector_t *umap_weights,
+        igraph_matrix_t *layout,
+        igraph_real_t a,
+        igraph_real_t b,
+        igraph_real_t learning_rate,
+        igraph_bool_t avoid_neighbor_repulsion,
         const igraph_vector_bool_t *is_fixed,
         igraph_integer_t negative_sampling_rate,
-        igraph_real_t min_dist,
         igraph_integer_t epoch,
-        const igraph_vector_t *epochs_per_edge,
+        igraph_integer_t epochs,
         igraph_vector_t *next_epoch_sample_per_edge)
 {
     igraph_integer_t no_of_nodes = igraph_matrix_nrow(layout);
@@ -391,7 +360,7 @@ static igraph_error_t igraph_i_umap_apply_forces(
         }
 
         /* set next epoch at which this edge will be sampled */
-        VECTOR(*next_epoch_sample_per_edge)[eid] += VECTOR(*epochs_per_edge)[eid];
+        VECTOR(*next_epoch_sample_per_edge)[eid] += 1.0 / VECTOR(*umap_weights)[eid];
 
         /* we move all vertices on one end of the edges, then we come back for
          * the vertices on the other end. This way we don't move both ends at the
@@ -467,7 +436,7 @@ static igraph_error_t igraph_i_umap_apply_forces(
                     /* NOTE: the efficiency of this step could be improved but it
                      * should be only used for small graphs anyway, so it's fine */
                     igraph_bool_t skip = 0;
-                    igraph_incident(graph, &neis, from, IGRAPH_ALL);
+                    IGRAPH_CHECK(igraph_incident(graph, &neis, from, IGRAPH_ALL));
                     nneis = igraph_vector_int_size(&neis);
                     for (igraph_integer_t k = 0; k < nneis; k++) {
                         igraph_integer_t eid2 = VECTOR(neis)[k];
@@ -528,16 +497,22 @@ static igraph_error_t igraph_i_umap_apply_forces(
     return IGRAPH_SUCCESS;
 }
 
+/* Edges with heavier weight/higher probability should be sampled more often. In
+ * other words, vertices at each end of those edges should be moved more often. If the
+ * edge weight is 1.0, which happens to each nearest neighbor due to the correction via
+ * rho, that vertices at the end of that edge are moved each single epoch. Conversely,
+ * vertices at the end of weak edges can be moved only once in a while. */
 static igraph_error_t igraph_i_umap_optimize_layout_stochastic_gradient(
         const igraph_t *graph,
-       const igraph_vector_t *umap_weights, igraph_real_t a, igraph_real_t b,
-       igraph_matrix_t *layout, igraph_integer_t epochs,
-       const igraph_vector_bool_t *is_fixed, igraph_integer_t negative_sampling_rate,
-       igraph_real_t min_dist,
-       const igraph_vector_t *epochs_per_edge) {
+        const igraph_vector_t *umap_weights,
+        igraph_real_t a,
+        igraph_real_t b,
+        igraph_matrix_t *layout,
+        igraph_integer_t epochs,
+        const igraph_vector_bool_t *is_fixed,
+        igraph_integer_t negative_sampling_rate) {
 
-    igraph_real_t learning_rate_initial = 1;
-    igraph_real_t learning_rate = learning_rate_initial;
+    igraph_real_t learning_rate = 1;
     igraph_integer_t no_of_edges = igraph_ecount(graph);
     igraph_vector_t next_epoch_sample_per_edge;
 
@@ -577,12 +552,17 @@ static igraph_error_t igraph_i_umap_optimize_layout_stochastic_gradient(
 #endif
 
         /* Apply (stochastic) forces */
-        igraph_i_umap_apply_forces(graph,
-                umap_weights, layout, a, b, learning_rate,
-                avoid_neighbor_repulsion, is_fixed, negative_sampling_rate,
-                min_dist,
+        igraph_i_umap_apply_forces(
+                graph,
+                umap_weights,
+                layout,
+                a, b,
+                learning_rate,
+                avoid_neighbor_repulsion,
+                is_fixed,
+                negative_sampling_rate,
                 e,
-                epochs_per_edge,
+                epochs,
                 &next_epoch_sample_per_edge);
 
 #ifdef UMAP_DEBUG
@@ -595,7 +575,7 @@ static igraph_error_t igraph_i_umap_optimize_layout_stochastic_gradient(
 #endif
 
          /* Adjust learning rate */
-        learning_rate = learning_rate_initial * (1.0 - (igraph_real_t)(e + 1) / epochs);
+        learning_rate = 1.0 - (igraph_real_t)(e + 1) / epochs;
 
         /* Allow interruption here */
         /* NOTE: this ends up being an implicit declaration which I guess is not great, but
@@ -662,9 +642,6 @@ igraph_error_t igraph_layout_treasuremap(
     igraph_integer_t no_of_edges = igraph_ecount(graph);
     /* probabilities of each edge being a real connection */
     igraph_vector_t umap_weights;
-    /* how many times each edge is sampled throughout the minimization, which is
-     * useful to move more often vertices next to strong edges */
-    igraph_vector_t epochs_per_edge;
 
     /* UMAP is sometimes used on unweighted graphs, that means distances are always zero */
     IGRAPH_CHECK(igraph_i_umap_check_distances(distances, no_of_edges));
@@ -695,28 +672,23 @@ igraph_error_t igraph_layout_treasuremap(
     /* From now on everything lives in probability space, it does not matter whether
      * the original graph was weighted/distanced or unweighted */
 
-    /* We want to move a vertex more often if it's next to a strong edge */
-    IGRAPH_VECTOR_INIT_FINALLY(&epochs_per_edge, no_of_edges);
-    if (igraph_i_umap_make_epochs_per_edge(&umap_weights, no_of_edges, epochs, &epochs_per_edge)) {
-        RNG_END();
-        return errorcode;
-    };
 
     /* Minimize cross-entropy between high-d and low-d probability
      * distributions */
     errorcode = igraph_i_umap_optimize_layout_stochastic_gradient(graph,
-            &umap_weights, a, b,
-            res, epochs, is_fixed, negative_sampling_rate,
-            min_dist,
-            &epochs_per_edge);
+            &umap_weights,
+            a, b,
+            res,
+            epochs,
+            is_fixed,
+            negative_sampling_rate);
     if(errorcode) {
         RNG_END();
         return errorcode;
     }
 
     igraph_vector_destroy(&umap_weights);
-    igraph_vector_destroy(&epochs_per_edge);
-    IGRAPH_FINALLY_CLEAN(2);
+    IGRAPH_FINALLY_CLEAN(1);
     RNG_END();
 
     return IGRAPH_SUCCESS;

@@ -23,13 +23,7 @@ class TreasuremapTests(unittest.TestCase):
         self.assertRaises(
                 ValueError, treasuremap_igraph,
                 graph=g,
-                sampling_prob=-0.01,
-            )
-
-        self.assertRaises(
-                ValueError, treasuremap_igraph,
-                graph=g,
-                sampling_prob=1.01,
+                negative_sampling_rate=-1,
             )
 
         self.assertRaises(
@@ -64,7 +58,7 @@ class TreasuremapTests(unittest.TestCase):
             0.2, 0.1, 0.1, 0.1, 0.1, 0.1, 0.08, 0.05, 0.1, 0.08, 0.12, 0.09, 0.11
             ]
         g = Graph(edges)
-        lo = treasuremap_igraph(g, dist=dist, epochs=500, sampling_prob=0.3)
+        lo = treasuremap_igraph(g, dist=dist, epochs=500)
         self.assertTrue(isinstance(lo, Layout))
 
         # One should get two clusters in this case
@@ -82,9 +76,9 @@ class TreasuremapTests(unittest.TestCase):
                 self.assertLess(dxy, 0.2 * distmax)
 
         # Test single epoch with seed
-        lo_adj = treasuremap_igraph(g, dist=dist, epochs=1, sampling_prob=1, seed=lo)
+        lo_adj = treasuremap_igraph(g, dist=dist, epochs=1, seed=lo)
         self.assertTrue(isinstance(lo_adj, Layout))
 
         # Same but inputting the coordinates
-        lo_adj = treasuremap_igraph(g, dist=dist, epochs=1, sampling_prob=1, seed=lo.coords)
+        lo_adj = treasuremap_igraph(g, dist=dist, epochs=1, seed=lo.coords)
         self.assertTrue(isinstance(lo_adj, Layout))

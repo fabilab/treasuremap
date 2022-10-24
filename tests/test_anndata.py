@@ -32,13 +32,7 @@ class TreasuremapTests(unittest.TestCase):
         self.assertRaises(
                 ValueError, treasuremap_adata,
                 adata=adata,
-                sampling_prob=-0.01,
-            )
-
-        self.assertRaises(
-                ValueError, treasuremap_adata,
-                adata=adata,
-                sampling_prob=1.01,
+                negative_sampling_rate=-1,
             )
 
         self.assertRaises(
@@ -82,7 +76,7 @@ class TreasuremapTests(unittest.TestCase):
             dmat[i, j] = dis
         adata.obsp['distances'] = dmat.tocoo()
 
-        lo = treasuremap_adata(adata, epochs=500, sampling_prob=0.3, copy=True,
+        lo = treasuremap_adata(adata, epochs=500, copy=True,
                                seed_name=None)
         self.assertTrue(isinstance(lo, np.ndarray))
         print(lo)
@@ -103,6 +97,6 @@ class TreasuremapTests(unittest.TestCase):
 
         # Test single epoch with seed
         adata.obsm['X_umap'] = lo
-        lo_adj = treasuremap_adata(adata, epochs=1, sampling_prob=1,
+        lo_adj = treasuremap_adata(adata, epochs=1,
                                    seed_name='umap', copy=True)
         self.assertTrue(isinstance(lo_adj, np.ndarray))
