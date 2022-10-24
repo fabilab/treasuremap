@@ -1,5 +1,6 @@
 import unittest
 from math import hypot
+import numpy as np
 from igraph import Graph, Layout, InternalError
 from treasuremap import treasuremap_igraph
 
@@ -43,7 +44,7 @@ class TreasuremapTests(unittest.TestCase):
         lo = treasuremap_igraph(g)
         self.assertEqual(lo.coords, [[0, 0]])
 
-    def testComplex(self):
+    def testSmall(self):
         # Graph with two articulation points
         edges = [
             0, 1, 0, 2, 0, 3, 1, 2, 1, 3, 2, 3,
@@ -82,3 +83,32 @@ class TreasuremapTests(unittest.TestCase):
         # Same but inputting the coordinates
         lo_adj = treasuremap_igraph(g, dist=dist, epochs=1, seed=lo.coords)
         self.assertTrue(isinstance(lo_adj, Layout))
+
+    def testLarge(self):
+        # Loosely connected clouds of highly connected vertices
+        cloud_sizes = [50, 100, 30, 20]
+        n_vertices = 0
+        edges = []
+        distances = []
+        for cloud_size in cloud_sizes:
+            for v1 in range(cloud_size):
+                for v2 in range(1, 11):
+                    edges.append(
+                        (v1 + n_vertices, v2 + n_vertices),
+                    )
+                    distances.append(2)
+            n_vertices += cloud_size
+
+        g = Graph(edges)
+        lo = treasuremap_igraph(
+            g,
+            dist=distances,
+            epochs=50,
+        )
+        self.assertTrue(isinstance(lo, Layout))
+
+        n_vertices = 0
+        for cloud_size in cloud_sizes:
+             err = np.std(lo[n_vertices: n_vertices + cloud_size], axis=0)
+             self.assertTrue((err < 1.0).all())
+             n_vertices += cloud_size 
