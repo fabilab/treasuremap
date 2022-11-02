@@ -41,7 +41,7 @@ class TreasuremapTests(unittest.TestCase):
     def testSingleton(self):
         # Singleton graph
         g = Graph(n=1)
-        lo = treasuremap_igraph(g)
+        lo = treasuremap_igraph(g, recenter_layout=True)
         self.assertEqual(lo.coords, [[0, 0]])
 
     def testSmall(self):
@@ -56,7 +56,7 @@ class TreasuremapTests(unittest.TestCase):
         dist = [
             0.1, 0.09, 0.12, 0.09, 0.1, 0.1,
             0.9, 0.9, 0.9,
-            0.2, 0.1, 0.1, 0.1, 0.1, 0.1, 0.08, 0.05, 0.1, 0.08, 0.12, 0.09, 0.11
+            0.2, 0.1, 0.1, 0.1, 0.1, 0.1, 0.08, 0.01, 0.1, 0.08, 0.12, 0.09, 0.11
             ]
         g = Graph(edges)
         lo = treasuremap_igraph(g, dist=dist, epochs=500)
@@ -74,7 +74,7 @@ class TreasuremapTests(unittest.TestCase):
                 dy = y[iclu + i] - yclu
                 dxy = hypot(dx, dy)
                 # Distance from each cluster's center should be relatively small
-                self.assertLess(dxy, 0.2 * distmax)
+                self.assertLess(dxy, 0.4 * distmax)
 
         # Test single epoch with seed
         lo_adj = treasuremap_igraph(g, dist=dist, epochs=1, seed=lo)
@@ -103,7 +103,7 @@ class TreasuremapTests(unittest.TestCase):
         lo = treasuremap_igraph(
             g,
             dist=distances,
-            epochs=50,
+            epochs=200,
         )
         self.assertTrue(isinstance(lo, Layout))
 

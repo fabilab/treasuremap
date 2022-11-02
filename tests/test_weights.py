@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-from treasuremap._treasuremap import compute_connectivities
+from treasuremap._treasuremap import compute_weights
 
 
 class TreasuremapTests(unittest.TestCase):
@@ -8,7 +8,7 @@ class TreasuremapTests(unittest.TestCase):
         nvertices = 0
         edges = []
         distances = []
-        connectivities = compute_connectivities(
+        connectivities = compute_weights(
                 nvertices, len(edges), edges, distances)
 
         self.assertEqual(type(connectivities), list)
@@ -17,7 +17,7 @@ class TreasuremapTests(unittest.TestCase):
     def testNullDistance(self):
         nvertices = 2
         edges = [(0, 1)]
-        connectivities = compute_connectivities(
+        connectivities = compute_weights(
                 nvertices, len(edges), edges, None)
 
         self.assertEqual(type(connectivities), list)
@@ -28,7 +28,7 @@ class TreasuremapTests(unittest.TestCase):
         nvertices = 2
         edges = [(0, 1)]
         distances = [14.0]
-        connectivities = compute_connectivities(
+        connectivities = compute_weights(
                 nvertices, len(edges), edges, distances)
 
         self.assertEqual(type(connectivities), list)

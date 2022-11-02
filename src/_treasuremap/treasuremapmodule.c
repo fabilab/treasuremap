@@ -115,7 +115,7 @@ static PyObject* treasuremapmodule_compute_crossentropy(
 
 }
 
-static PyObject* treasuremapmodule_compute_connectivities(PyObject *self, PyObject *args, PyObject *kwds) {
+static PyObject* treasuremapmodule_compute_weights(PyObject *self, PyObject *args, PyObject *kwds) {
 
     static char *kwlist[] = {
         "nvertices",
@@ -148,7 +148,7 @@ static PyObject* treasuremapmodule_compute_connectivities(PyObject *self, PyObje
         distancesp = &distances;
     }
 
-    // Prepare the output connectivities
+    // Prepare the output weights
     if (igraph_vector_init(&res, 0)) {
         igraph_vector_destroy(&distances);
         return NULL;
@@ -170,8 +170,8 @@ static PyObject* treasuremapmodule_compute_connectivities(PyObject *self, PyObje
     }
     igraph_vector_int_destroy(&edges);
 
-    // Compute connectivities
-    return_code = treasuremap_compute_connectivities(
+    // Compute weights
+    return_code = treasuremap_compute_weights(
             &graph,
             distancesp,
             &res
@@ -211,13 +211,13 @@ static PyObject* treasuremapmodule_treasuremap(PyObject *self, PyObject *args, P
         "dim",
         "negative_sampling_rate",
         "a", "b",
-        "distances_are_connectivities",
+        "distances_are_weights",
         NULL };
     long nedges, nvertices;
     PyObject *edges_o, *dist_o = Py_None, *seed_o = Py_None, *is_fixed_o = Py_None;
     double min_dist;
     long epochs, ndim, negative_sampling_rate = 5;
-    int distances_are_connectivities;
+    int distances_are_weights;
     PyObject *output;
     double a = -1, b = -1;
 
@@ -235,7 +235,7 @@ static PyObject* treasuremapmodule_treasuremap(PyObject *self, PyObject *args, P
                                     &edges_o, &dist_o, &seed_o, &is_fixed_o,
                                     &min_dist, &epochs, &ndim,
                                     &negative_sampling_rate, &a, &b,
-                                    &distances_are_connectivities
+                                    &distances_are_weights
                                     ))
         return NULL;
 
@@ -322,7 +322,7 @@ static PyObject* treasuremapmodule_treasuremap(PyObject *self, PyObject *args, P
             a,
             b,
             negative_sampling_rate,
-            distances_are_connectivities
+            distances_are_weights
             );
 
     // Destroy intermediate data structures
@@ -359,7 +359,7 @@ static igraph_error_t treasuremapmodule_igraph_interrupt_hook(void* data) {
 static PyMethodDef treasuremapmodule_methods[] = {
     {"layout_treasuremap", (PyCFunction) treasuremapmodule_treasuremap, METH_VARARGS | METH_KEYWORDS, "Run the C-level treasuremap function"},
     {"fit_ab", (PyCFunction) treasuremapmodule_fit_ab, METH_VARARGS | METH_KEYWORDS, "Fit a and b parameters from min_dist"},
-    {"compute_connectivities", (PyCFunction) treasuremapmodule_compute_connectivities, METH_VARARGS | METH_KEYWORDS, "Compute connectivities from distances"},
+    {"compute_weights", (PyCFunction) treasuremapmodule_compute_weights, METH_VARARGS | METH_KEYWORDS, "Compute weights from distances"},
     {"compute_crossentropy", (PyCFunction) treasuremapmodule_compute_crossentropy, METH_VARARGS | METH_KEYWORDS, "Compute cross-entropy"},
     {NULL, NULL, 0, NULL}
 };

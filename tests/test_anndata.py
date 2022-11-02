@@ -76,8 +76,9 @@ class TreasuremapTests(unittest.TestCase):
             dmat[i, j] = dis
         adata.obsp['distances'] = dmat.tocoo()
 
-        lo = treasuremap_adata(adata, epochs=500, copy=True,
-                               seed_name=None)
+        lo = treasuremap_adata(adata, epochs=500,
+                               copy=True,
+                               seed_name='umap')
         self.assertTrue(isinstance(lo, np.ndarray))
         print(lo)
 

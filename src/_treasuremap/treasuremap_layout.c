@@ -85,10 +85,10 @@ static igraph_error_t igraph_i_umap_find_sigma(const igraph_vector_t *distances,
  * and computes them in a separate function. Here, we have a single function computing
  * the sigmas (scale factors), rhos (minimal distance or connectivity correction)
  * and the probability graph in one go. */
-igraph_error_t treasuremap_compute_connectivities(
+igraph_error_t treasuremap_compute_weights(
         const igraph_t *graph,
         const igraph_vector_t *distances,
-        igraph_vector_t *connectivities) {
+        igraph_vector_t *weights) {
 
     igraph_integer_t no_of_nodes = igraph_vcount(graph);
     igraph_integer_t no_of_edges = igraph_ecount(graph);
@@ -96,8 +96,8 @@ igraph_error_t treasuremap_compute_connectivities(
     igraph_vector_int_t eids, weight_seen;
     igraph_real_t rho, dist_max, dist, sigma, weight, weight_inv, sigma_target;
 
-    /* Resize connectivities */
-    IGRAPH_CHECK(igraph_vector_resize(connectivities, no_of_edges));
+    /* Resize weights */
+    IGRAPH_CHECK(igraph_vector_resize(weights, no_of_edges));
 
     /* Trivial case */
     if (no_of_edges == 0) {
@@ -107,7 +107,7 @@ igraph_error_t treasuremap_compute_connectivities(
     /* if the original graph is unweighted, probabilities are 1 throughout */
     if (distances == NULL) {
         for (igraph_integer_t j = 0; j < no_of_edges; j++) {
-            VECTOR(*connectivities)[j] = 1;
+            VECTOR(*weights)[j] = 1;
         }
         return IGRAPH_SUCCESS;
     }
@@ -150,7 +150,7 @@ igraph_error_t treasuremap_compute_connectivities(
                         sigma_target));
         }
 
-        /* Convert to connectivity
+        /* Convert to weight
          * Each edge is seen twice, from each of its two vertices. Because this weight
          * is a probability and the probability of the two vertices to be close are set
          * as the probability of either "edge direction" being legit, the final weight
@@ -172,7 +172,7 @@ igraph_error_t treasuremap_compute_connectivities(
 
             /* Compute the probability of either edge direction if you can */
             if (VECTOR(weight_seen)[eid] != 0) {
-                weight_inv = VECTOR(*connectivities)[eid];
+                weight_inv = VECTOR(*weights)[eid];
                 weight = weight + weight_inv - weight * weight_inv;
             }
 
@@ -180,7 +180,7 @@ igraph_error_t treasuremap_compute_connectivities(
             fprintf(stderr, "distance: %g\n", VECTOR(*distances)[eid]);
             fprintf(stderr, "weight: %g\n", weight);
 #endif
-            VECTOR(*connectivities)[eid] = weight;
+            VECTOR(*weights)[eid] = weight;
             VECTOR(weight_seen)[eid] += 1;
         }
 
@@ -196,7 +196,7 @@ igraph_error_t treasuremap_compute_connectivities(
 /* cross-entropy */
 igraph_error_t igraph_umap_compute_cross_entropy(
         const igraph_t *graph,
-        const igraph_vector_t *connectivities,
+        const igraph_vector_t *weights,
         const igraph_matrix_t *layout,
         igraph_real_t a, igraph_real_t b,
         igraph_real_t *cross_entropy
@@ -219,7 +219,7 @@ igraph_error_t igraph_umap_compute_cross_entropy(
      * */
     *cross_entropy = 0;
     for (igraph_integer_t eid = 0; eid < no_of_edges; eid++) {
-        mu = VECTOR(*connectivities)[eid];
+        mu = VECTOR(*weights)[eid];
 
         /* Find vertices */
         from = IGRAPH_FROM(graph, eid);
@@ -307,7 +307,7 @@ static igraph_real_t igraph_i_umap_repel(
 
 static igraph_error_t igraph_i_umap_apply_forces(
         const igraph_t *graph,
-        const igraph_vector_t *connectivities,
+        const igraph_vector_t *weights,
         igraph_matrix_t *layout,
         igraph_real_t a,
         igraph_real_t b,
@@ -350,7 +350,7 @@ static igraph_error_t igraph_i_umap_apply_forces(
         }
 
         /* set next epoch at which this edge will be sampled */
-        VECTOR(*next_epoch_sample_per_edge)[eid] += 1.0 / VECTOR(*connectivities)[eid];
+        VECTOR(*next_epoch_sample_per_edge)[eid] += 1.0 / VECTOR(*weights)[eid];
 
         /* we move all vertices on one end of the edges, then we come back for
          * the vertices on the other end. This way we don't move both ends at the
@@ -494,7 +494,7 @@ static igraph_error_t igraph_i_umap_apply_forces(
  * vertices at the end of weak edges can be moved only once in a while. */
 static igraph_error_t igraph_i_umap_optimize_layout_stochastic_gradient(
         const igraph_t *graph,
-        const igraph_vector_t *connectivities,
+        const igraph_vector_t *weights,
         igraph_real_t a,
         igraph_real_t b,
         igraph_matrix_t *layout,
@@ -533,7 +533,7 @@ static igraph_error_t igraph_i_umap_optimize_layout_stochastic_gradient(
      * */
 #ifdef UMAP_DEBUG
     igraph_umap_compute_cross_entropy(
-            graph, connectivities, layout, a, b, &cross_entropy);
+            graph, weights, layout, a, b, &cross_entropy);
 #endif
 
     for (igraph_integer_t e = 0; e < epochs; e++) {
@@ -544,7 +544,7 @@ static igraph_error_t igraph_i_umap_optimize_layout_stochastic_gradient(
         /* Apply (stochastic) forces */
         igraph_i_umap_apply_forces(
                 graph,
-                connectivities,
+                weights,
                 layout,
                 a, b,
                 learning_rate,
@@ -559,7 +559,7 @@ static igraph_error_t igraph_i_umap_optimize_layout_stochastic_gradient(
         /* Recompute CE and check how it's going*/
         cross_entropy_old = cross_entropy;
         igraph_umap_compute_cross_entropy(
-                graph, connectivities, layout, a, b, &cross_entropy);
+                graph, weights, layout, a, b, &cross_entropy);
 
         fprintf(stderr, "Cross-entropy before epoch: %g, after epoch: %g\n", cross_entropy_old, cross_entropy);
 #endif
@@ -601,7 +601,7 @@ igraph_error_t igraph_layout_treasuremap(
         igraph_real_t a,
         igraph_real_t b,
         igraph_integer_t negative_sampling_rate,
-        int distances_are_connectivities
+        int distances_are_weights
         ) {
 
     igraph_error_t errorcode;
@@ -610,8 +610,8 @@ igraph_error_t igraph_layout_treasuremap(
     igraph_integer_t no_of_fixed = 0;
     igraph_integer_t i;
     /* probabilities of each edge being a real connection */
-    igraph_vector_t connectivities;
-    igraph_vector_t *connectivitiesp;
+    igraph_vector_t weights;
+    igraph_vector_t *weightsp;
 
     /* Distances should be of the right number and nonnegative */
     if (distances != NULL) {
@@ -649,18 +649,18 @@ igraph_error_t igraph_layout_treasuremap(
         return IGRAPH_SUCCESS;
 
     /* Make combined graph with smoothed probabilities. If the user already provides
-     * connectivities, we don't need to do it ourselves */
-    if (!distances_are_connectivities) {
-        IGRAPH_CHECK(igraph_vector_init(&connectivities, 0));
-        errorcode = treasuremap_compute_connectivities(graph, distances, &connectivities);
+     * weights, we don't need to do it ourselves */
+    if (!distances_are_weights) {
+        IGRAPH_CHECK(igraph_vector_init(&weights, 0));
+        errorcode = treasuremap_compute_weights(graph, distances, &weights);
         if (errorcode) {
-            igraph_vector_destroy(&connectivities);
+            igraph_vector_destroy(&weights);
             IGRAPH_FINALLY_CLEAN(1);
             return errorcode;
         }
-        connectivitiesp = &connectivities;
+        weightsp = &weights;
     } else {
-        connectivitiesp = (igraph_vector_t *) distances;
+        weightsp = (igraph_vector_t *) distances;
     }
     /* From now on everything lives in probability space, it does not matter whether
      * the original graph was weighted/distanced or unweighted */
@@ -670,7 +670,7 @@ igraph_error_t igraph_layout_treasuremap(
     /* Minimize cross-entropy between high-d and low-d probability
      * distributions */
     if (igraph_i_umap_optimize_layout_stochastic_gradient(graph,
-            connectivitiesp,
+            weightsp,
             a, b,
             res,
             epochs,
@@ -678,16 +678,17 @@ igraph_error_t igraph_layout_treasuremap(
             negative_sampling_rate)) {
 
         RNG_END();
-        if (!distances_are_connectivities) {
-            igraph_vector_destroy(&connectivities);
+        if (!distances_are_weights) {
+            igraph_vector_destroy(&weights);
             IGRAPH_FINALLY_CLEAN(1);
         }
         return errorcode;
     }
 
     RNG_END();
-    if (!distances_are_connectivities) {
-        igraph_vector_destroy(&connectivities);
+
+    if (!distances_are_weights) {
+        igraph_vector_destroy(&weights);
         IGRAPH_FINALLY_CLEAN(1);
     }
 

@@ -53,13 +53,13 @@ igraph_error_t igraph_layout_treasuremap(
         igraph_real_t a,
         igraph_real_t b,
         igraph_integer_t negative_sampling_rate,
-        int distances_are_connectivities
+        int distances_are_weights
         );
 
-igraph_error_t treasuremap_compute_connectivities(
+igraph_error_t treasuremap_compute_weights(
         const igraph_t *graph,
         const igraph_vector_t *distances,
-        igraph_vector_t *connectivities);
+        igraph_vector_t *weights);
 
 igraph_error_t igraph_umap_compute_cross_entropy(
         const igraph_t *graph,

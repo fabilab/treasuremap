@@ -25,7 +25,7 @@ def treasuremap_adata(
         negative_sampling_rate=4,
         seed_nonfixed='closest_fixed',
         recenter_layout=False,
-        use_connectivities=False,
+        use_weights=False,
     ):
     """Compute a Treasuremap embedding starting from an AnnData object
 
@@ -40,7 +40,7 @@ def treasuremap_adata(
     # usually the connectivities as weighted, sparse matrices. So there is no
     # obvious way to use treasuremap's ability to work on unweighted graphs
     # when using the AnnData interface.
-    if not use_connectivities:
+    if not use_weights:
         if 'distances' not in adata.obsp:
             raise KeyError("AnnData object must have an obsp['distances'] matrix")
         dist_matrix = adata.obsp['distances'].tocoo()
@@ -70,7 +70,7 @@ def treasuremap_adata(
     else:
         obsm_name = f'X_{seed_name}'
         if obsm_name not in adata.obsm:
-            raise KeyError("AnnData object missing {obsm_name} field")
+            raise KeyError(f"AnnData object missing {obsm_name} field")
         seed = adata.obsm[f'X_{seed_name}']
         seed_dim = seed.shape[1]
         if seed_dim != dim:
@@ -89,11 +89,10 @@ def treasuremap_adata(
                 for i in row.indices:
                     # If a fixed neighbor is found, take its coordinates
                     if is_fixed[i]:
-                        for j in range(len(coords)):
-                            coords[j] = seed[i][j] + 0.01 * np.random.rand()
+                        seed[k] = [seed[i][j] for j in range(dim)]
                         break
                 else:
-                    seed[k] = list(np.random.rand(dim))
+                    seed[k] = np.random.rand(dim).tolist()
 
         if (seed_name in adata.uns) and ('params' in adata.uns[seed_name]):
             if 'a' in adata.uns[seed_name]['params']:
@@ -112,7 +111,7 @@ def treasuremap_adata(
         epochs,
         dim,
         negative_sampling_rate=negative_sampling_rate,
-        distances_are_connectivities=use_connectivities,
+        distances_are_weights=use_weights,
         **kwargs,
     )
     result = np.asarray(result).astype(np.float32)
@@ -145,6 +144,7 @@ def treasuremap_igraph(
     nvertices = graph.vcount()
     nedges = graph.ecount()
     edges = graph.get_edgelist()
+    seed = np.random.rand(nvertices, dim).tolist()
 
     result = _treasuremap.layout_treasuremap(
         nvertices,
@@ -158,7 +158,7 @@ def treasuremap_igraph(
         dim,
         negative_sampling_rate=negative_sampling_rate,
     )
-    result = np.asarray(result).astype(np.float32)    
+    result = np.asarray(result).astype(np.float32)
 
     if recenter_layout and len(result):
         result -= result.mean(axis=0)
