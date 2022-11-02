@@ -56,7 +56,7 @@ class TreasuremapTests(unittest.TestCase):
 
     def testComplex(self):
         adata = anndata.AnnData(X=np.ones((12, 20), np.float32))
-        adata.obsm['X_umap'] = np.zeros((12, 2), np.float32)
+        adata.obsm['X_umap'] = np.random.rand(12, 2).astype(np.float32)
 
         # Graph with two articulation points
         edges = [
