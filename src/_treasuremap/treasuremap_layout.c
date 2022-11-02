@@ -96,6 +96,21 @@ igraph_error_t treasuremap_compute_weights(
     igraph_vector_int_t eids, weight_seen;
     igraph_real_t rho, dist_max, dist, sigma, weight, weight_inv, sigma_target;
 
+    /* Check input distances */
+    if (distances != NULL) {
+        if (igraph_vector_size(distances) != no_of_edges) {
+            IGRAPH_ERROR("Weights must be the same number as the edges in the graph.", IGRAPH_EINVAL);
+        }
+        if (no_of_edges > 0) {
+            igraph_real_t distance_min = igraph_vector_min(distances);
+            if (distance_min < 0) {
+                IGRAPH_ERROR("Distance vector must be nonnegative.", IGRAPH_EINVAL);
+            } else if (isnan(distance_min)) {
+                IGRAPH_ERROR("Distance vector must not contain NaN values.", IGRAPH_EINVAL);
+            }
+        }
+    }
+
     /* Resize weights */
     IGRAPH_CHECK(igraph_vector_resize(weights, no_of_edges));
 
@@ -593,15 +608,14 @@ static igraph_error_t igraph_i_umap_optimize_layout_stochastic_gradient(
 igraph_error_t igraph_layout_treasuremap(
         const igraph_t *graph,
         igraph_matrix_t *res,
-        const igraph_vector_t *distances,
+        const igraph_vector_t *weights,
         igraph_real_t min_dist,
         igraph_integer_t epochs,
         igraph_integer_t ndim,
         const igraph_vector_bool_t *is_fixed,
         igraph_real_t a,
         igraph_real_t b,
-        igraph_integer_t negative_sampling_rate,
-        int distances_are_weights
+        igraph_integer_t negative_sampling_rate
         ) {
 
     igraph_error_t errorcode;
@@ -609,23 +623,10 @@ igraph_error_t igraph_layout_treasuremap(
     igraph_integer_t no_of_edges = igraph_ecount(graph);
     igraph_integer_t no_of_fixed = 0;
     igraph_integer_t i;
-    /* probabilities of each edge being a real connection */
-    igraph_vector_t weights;
-    igraph_vector_t *weightsp;
 
     /* Distances should be of the right number and nonnegative */
-    if (distances != NULL) {
-        if (igraph_vector_size(distances) != no_of_edges) {
-            IGRAPH_ERROR("Distances must be the same number as the edges in the graph.", IGRAPH_EINVAL);
-        }
-        if (no_of_edges > 0) {
-            igraph_real_t distance_min = igraph_vector_min(distances);
-            if (distance_min < 0) {
-                IGRAPH_ERROR("Distance vector must be nonnegative.", IGRAPH_EINVAL);
-            } else if (isnan(distance_min)) {
-                IGRAPH_ERROR("Distance vector must not contain NaN values.", IGRAPH_EINVAL);
-            }
-        }
+    if (igraph_vector_size(weights) != no_of_edges) {
+        IGRAPH_ERROR("Weights must be the same number as the edges in the graph.", IGRAPH_EINVAL);
     }
 
     /* Count the number of fixed vertices, sanity check */
@@ -648,49 +649,17 @@ igraph_error_t igraph_layout_treasuremap(
     if (no_of_fixed == no_of_vertices)
         return IGRAPH_SUCCESS;
 
-    /* Make combined graph with smoothed probabilities. If the user already provides
-     * weights, we don't need to do it ourselves */
-    if (!distances_are_weights) {
-        IGRAPH_CHECK(igraph_vector_init(&weights, 0));
-        errorcode = treasuremap_compute_weights(graph, distances, &weights);
-        if (errorcode) {
-            igraph_vector_destroy(&weights);
-            IGRAPH_FINALLY_CLEAN(1);
-            return errorcode;
-        }
-        weightsp = &weights;
-    } else {
-        weightsp = (igraph_vector_t *) distances;
-    }
-    /* From now on everything lives in probability space, it does not matter whether
-     * the original graph was weighted/distanced or unweighted */
-
     RNG_BEGIN();
 
     /* Minimize cross-entropy between high-d and low-d probability
      * distributions */
-    if (igraph_i_umap_optimize_layout_stochastic_gradient(graph,
-            weightsp,
+    errorcode = igraph_i_umap_optimize_layout_stochastic_gradient(graph,
+            weights,
             a, b,
             res,
             epochs,
             is_fixed,
-            negative_sampling_rate)) {
-
-        RNG_END();
-        if (!distances_are_weights) {
-            igraph_vector_destroy(&weights);
-            IGRAPH_FINALLY_CLEAN(1);
-        }
-        return errorcode;
-    }
-
+            negative_sampling_rate);
     RNG_END();
-
-    if (!distances_are_weights) {
-        igraph_vector_destroy(&weights);
-        IGRAPH_FINALLY_CLEAN(1);
-    }
-
-    return IGRAPH_SUCCESS;
+    return errorcode;
 }

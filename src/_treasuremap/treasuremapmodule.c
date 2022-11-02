@@ -223,9 +223,10 @@ static PyObject* treasuremapmodule_treasuremap(PyObject *self, PyObject *args, P
 
     igraph_error_t return_code = 0;
     igraph_vector_int_t edges;
-    igraph_vector_t distances;
+    igraph_vector_t distances, weights;
     igraph_vector_bool_t is_fixed;
-    igraph_vector_bool_t *is_fixedp = NULL, *distancesp = NULL;
+    igraph_vector_bool_t *is_fixedp = NULL;
+    igraph_vector_t *distancesp = NULL;
     igraph_t graph;
     igraph_matrix_t res;
 
@@ -298,6 +299,21 @@ static PyObject* treasuremapmodule_treasuremap(PyObject *self, PyObject *args, P
     }
     igraph_vector_int_destroy(&edges);
 
+    // Compute weights
+    if (igraph_vector_init(&weights, 0)) {
+        igraph_destroy(&graph);
+        if (is_fixed_o != Py_None) igraph_vector_bool_destroy(&is_fixed);
+        if (dist_o != Py_None) igraph_vector_destroy(&distances);
+        return NULL;
+    }
+    if (treasuremap_compute_weights(&graph, distancesp, &weights)) {
+        igraph_destroy(&graph);
+        if (is_fixed_o != Py_None) igraph_vector_bool_destroy(&is_fixed);
+        if (dist_o != Py_None) igraph_vector_destroy(&distances);
+        igraph_vector_destroy(&weights);
+        return NULL;
+    }
+
     /* Fit a and b parameter to find smooth approximation to
      * probability distribution in embedding space */
     if ((a < 0) || (b < 0)) {
@@ -306,6 +322,7 @@ static PyObject* treasuremapmodule_treasuremap(PyObject *self, PyObject *args, P
             igraph_destroy(&graph);
             if (is_fixed_o != Py_None) igraph_vector_bool_destroy(&is_fixed);
             if (dist_o != Py_None) igraph_vector_destroy(&distances);
+            igraph_vector_destroy(&weights);
             return NULL;
         }
     }
@@ -314,21 +331,21 @@ static PyObject* treasuremapmodule_treasuremap(PyObject *self, PyObject *args, P
     return_code = igraph_layout_treasuremap(
             &graph,
             &res,
-            distancesp,
+            &weights,
             min_dist,
             epochs,
             (int) ndim,
             is_fixedp,
             a,
             b,
-            negative_sampling_rate,
-            distances_are_weights
+            negative_sampling_rate
             );
 
     // Destroy intermediate data structures
     igraph_destroy(&graph);
     if (is_fixed_o != Py_None) igraph_vector_bool_destroy(&is_fixed);
     if (dist_o != Py_None) igraph_vector_destroy(&distances);
+    igraph_vector_destroy(&weights);
 
     if (return_code != IGRAPH_SUCCESS) {
         igraph_matrix_destroy(&res);
