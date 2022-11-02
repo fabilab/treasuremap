@@ -111,4 +111,4 @@ class TreasuremapTests(unittest.TestCase):
         for cloud_size in cloud_sizes:
              err = np.std(lo[n_vertices: n_vertices + cloud_size], axis=0)
              self.assertTrue((err < 1.0).all())
-             n_vertices += cloud_size 
+             n_vertices += cloud_size

@@ -14,95 +14,12 @@ import treasuremap._treasuremap as _treasuremap
 from treasuremap.compress_atlas import subsample_atlas
 
 
-def _recenter(result):
-    """Recenter layout after algo"""
-    if len(result) == 0:
-        return
-    dim = len(result[0])
-
-    # Find center
-    centers = [0 for i in range(dim)]
-    for cell in result:
-        for i, coord in enumerate(cell):
-            centers[i] += coord
-    for i in range(dim):
-        centers[i] /= len(result)
-
-    # Recenter in place
-    for cell in result:
-        for i, coord in enumerate(cell):
-            cell[i] -= centers[i]
-
-
-def _layout_treasuremap(
-        nvertices,
-        nedges,
-        edges,
-        dist=None,
-        seed=None,
-        is_fixed=None,
-        min_dist=0.01,
-        epochs=10,
-        dim=2,
-        negative_sampling_rate=4,
-        a=-1,
-        b=-1,
-        distances_are_connectivities=False,
-    ):
-
-    if min_dist < 0:
-        raise ValueError(f"Minimum distance must be positive, got {min_dist}")
-
-    if epochs < 0:
-        raise ValueError(f"Number of epochs must be nonnegative, got {epochs}")
-
-    if dim not in (2, 3):
-        raise ValueError(f"Number of dimensions must be 2 or 3, for {dim}")
-
-    if negative_sampling_rate < 0:
-        raise ValueError(f"Negative sampling rate must be nonnegative, got {negative_sampling_rate}")
-
-    if nvertices == 0:
-        return Layout([])
-    if nvertices == 1:
-        return Layout([[0, 0]])
-
-    if len(edges) == 0:
-        raise ValueError("graph has no edges, Treasuremap cannot do much...")
-
-    if is_fixed is None:
-        is_fixed = [False] * nvertices
-    # If all vertices are fixed, why are you calling this?
-    elif sum(is_fixed) == nvertices:
-        return [list(x) for x in seed]
-
-    if len(is_fixed) != nvertices:
-        raise ValueError("is_fixed must be a boolean vector of length n. vertices")
-
-    if dist is None:
-        dist = [1] * nedges
-    if len(dist) != nedges:
-        raise ValueError("dist must be a vector with length n. edges")
-
-    # Call C function
-    result = _treasuremap.layout_treasuremap(
-        nvertices, nedges,
-        edges, dist, seed, is_fixed,
-        min_dist, epochs, dim,
-        negative_sampling_rate,
-        a, b,
-        distances_are_connectivities,
-    )
-
-    return result
-
-
 def treasuremap_adata(
         adata : AnnData,
         seed_name='umap',
         is_fixed=None,
-        min_dist=0.01,
-        epochs=10,
+        min_dist=0,
+        epochs=100,
         dim=2,
         copy=False,
         negative_sampling_rate=4,
@@ -110,11 +27,19 @@ def treasuremap_adata(
         recenter_layout=False,
         use_connectivities=False,
     ):
+    """Compute a Treasuremap embedding starting from an AnnData object
+
+    Args:
+    ...
+    """
+
     if AnnData is None:
         raise ImportError("Install the package anndata to use this function")
 
-    nvertices = adata.shape[0]
-
+    # NOTE: AnnData does not store the graph per se, only the distances and
+    # usually the connectivities as weighted, sparse matrices. So there is no
+    # obvious way to use treasuremap's ability to work on unweighted graphs
+    # when using the AnnData interface.
     if not use_connectivities:
         if 'distances' not in adata.obsp:
             raise KeyError("AnnData object must have an obsp['distances'] matrix")
@@ -125,15 +50,23 @@ def treasuremap_adata(
             raise KeyError("AnnData object must have an obsp['connectivities'] matrix")
         dist_matrix = adata.obsp['connectivities'].tocoo()
 
-    edges = list(zip(dist_matrix.row, dist_matrix.col))
-    dist = list(dist_matrix.data)
+    # Get edges and distances, ignoring loops
+    edges = []
+    dist = []
+    for i, j, d in zip(dist_matrix.row, dist_matrix.col, dist_matrix.data):
+        if i == j:
+            continue
+        edges.append((i, j))
+        dist.append(d)
     nedges = len(dist)
+    nvertices = adata.shape[0]
+
     if is_fixed is not None:
         is_fixed = [True if x else False for x in is_fixed]
 
     kwargs = {}
     if (seed_name is None) or (seed_name == ''):
-        seed = None
+        seed = np.random.rand(nvertices, dim).tolist()
     else:
         obsm_name = f'X_{seed_name}'
         if obsm_name not in adata.obsm:
@@ -144,14 +77,10 @@ def treasuremap_adata(
             raise ValueError("{obsm_name} is {seed_dim}D, requested {dim}D embedding")
         seed = seed.tolist()
 
-        # FIXME
-        adata.obs['no_fixed_neighbor'] = False
-
         # If requested, seed free nodes with the coordinate of a fixed neighbor
-        # We introduce a little noise to avoid exact overlapping
+        # If the vertex has no fixed neighbor, just put it at random
         if (seed_nonfixed == 'closest_fixed') and (is_fixed is not None) and any(is_fixed):
             dist_matrix = dist_matrix.tocsr()
-            no_fixed_nei = []
             for k, (coords, row, fix) in enumerate(zip(seed, dist_matrix, is_fixed)):
                 # If you're a fixed node, you already have fixed coords
                 if fix:
@@ -164,29 +93,7 @@ def treasuremap_adata(
                             coords[j] = seed[i][j] + 0.01 * np.random.rand()
                         break
                 else:
-                    # No fixed neighbor, accumulate and seed at the end
-                    no_fixed_nei.append(k)
-
-            while no_fixed_nei:
-                k = no_fixed_nei[0]
-                row = dist_matrix[k]
-                coords = seed[k]
-                for i in row.indices:
-                    # This neighbor also has no fixed neighbors, look for a
-                    # better neighbor if available
-                    if i in no_fixed_nei:
-                        continue
-                    # This neighbor has fixed neighbors, so it got assigned a
-                    # coordinate already, copy it over
-                    for j in range(len(coords)):
-                        coords[j] = seed[i][j] + 0.01 * np.random.rand()
-                    break
-                else:
-                    # All neighbors are also without a neighbor, use a totaly
-                    # random starting position
-                    for j in range(len(coords)):
-                        coords[j] = 15.0 * np.random.rand()
-                del no_fixed_nei[0]
+                    seed[k] = list(np.random.rand(dim))
 
         if (seed_name in adata.uns) and ('params' in adata.uns[seed_name]):
             if 'a' in adata.uns[seed_name]['params']:
@@ -194,7 +101,7 @@ def treasuremap_adata(
             if 'b' in adata.uns[seed_name]['params']:
                 kwargs['b'] = adata.uns[seed_name]['params']['b']
 
-    result = _layout_treasuremap(
+    result = _treasuremap.layout_treasuremap(
         nvertices,
         nedges,
         edges,
@@ -224,11 +131,13 @@ def treasuremap_igraph(
         dist=None,
         seed=None,
         is_fixed=None,
-        min_dist=0.01,
-        epochs=10,
+        min_dist=0,
+        epochs=100,
         dim=2,
         negative_sampling_rate=5,
+        recenter_layout=False,
     ):
+    """Compute a Treasuremap embedding starting from an igraph Graph."""
 
     if Graph is None:
         raise ImportError("Install the package igraph to use this function")
@@ -237,7 +146,7 @@ def treasuremap_igraph(
     nedges = graph.ecount()
     edges = graph.get_edgelist()
 
-    result = _layout_treasuremap(
+    result = _treasuremap.layout_treasuremap(
         nvertices,
         nedges,
         edges,
@@ -249,9 +158,10 @@ def treasuremap_igraph(
         dim,
         negative_sampling_rate=negative_sampling_rate,
     )
+    result = np.asarray(result).astype(np.float32)    
 
-    # Recenter
-    _recenter(result)
+    if recenter_layout and len(result):
+        result -= result.mean(axis=0)
 
     result = Layout(result)
     return result

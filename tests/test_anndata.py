@@ -46,7 +46,7 @@ class TreasuremapTests(unittest.TestCase):
         self.assertTrue(isinstance(lo, np.ndarray))
         self.assertEqual(lo.size, 0)
 
-    def testSingleton(self):
+    def testSingleEdge(self):
         adata = anndata.AnnData(X=np.ones((1, 20), np.float32))
         adata.obsp['distances'] = sp.sparse.coo_matrix(np.ones((1, 1), np.float32))
         adata.obsm['X_umap'] = np.zeros((1, 2), np.float32)

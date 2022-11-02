@@ -10,6 +10,7 @@ set -e
 CLEAN=0
 PYTEST_ARGS=
 VENV_DIR=.venv
+PYTEST_ARGS=${1:-tests}
 
 while getopts ":ce:k:" OPTION; do
     echo "$OPTION"
@@ -41,5 +42,5 @@ if [ x$CLEAN = x1 ]; then
 fi
 
 $VENV_DIR/bin/pip install .[test]
-$VENV_DIR/bin/pytest tests ${PYTEST_ARGS}
+$VENV_DIR/bin/pytest ${PYTEST_ARGS}
 

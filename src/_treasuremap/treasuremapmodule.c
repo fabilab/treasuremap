@@ -115,102 +115,210 @@ static PyObject* treasuremapmodule_compute_crossentropy(
 
 }
 
+static PyObject* treasuremapmodule_compute_connectivities(PyObject *self, PyObject *args, PyObject *kwds) {
+
+    static char *kwlist[] = {
+        "nvertices",
+        "nedges",
+        "edges",
+        "dist",
+        NULL };
+    long nedges, nvertices;
+    PyObject *edges_o, *dist_o;
+    PyObject *output;
+
+    igraph_error_t return_code = 0;
+    igraph_vector_int_t edges;
+    igraph_vector_t distances;
+    igraph_vector_t *distancesp = NULL;
+    igraph_t graph;
+    igraph_vector_t res;
+
+    /* Parse arguments */
+    if(!PyArg_ParseTupleAndKeywords(args, kwds, "llOO", kwlist,
+                                    &nvertices, &nedges,
+                                    &edges_o, &dist_o))
+        return NULL;
+
+    /* Get distances */
+    if (dist_o != Py_None) {
+        if (igraphmodule_PyObject_float_to_vector_t(dist_o, &distances)) {
+            return NULL;
+        }
+        distancesp = &distances;
+    }
+
+    // Prepare the output connectivities
+    if (igraph_vector_init(&res, 0)) {
+        igraph_vector_destroy(&distances);
+        return NULL;
+    }
+
+    // edgelist (already flattened)
+    if (igraphmodule_PyObject_to_edgelist(edges_o, &edges)) {
+        igraph_vector_destroy(&res);
+        if (dist_o != Py_None) igraph_vector_destroy(&distances);
+        return NULL;
+    }
+
+    // Initialize graph
+    if (igraph_create(&graph, &edges, nvertices, false)) {
+        igraph_vector_destroy(&res);
+        igraph_vector_int_destroy(&edges);
+        if (dist_o != Py_None) igraph_vector_destroy(&distances);
+        return NULL;
+    }
+    igraph_vector_int_destroy(&edges);
+
+    // Compute connectivities
+    return_code = treasuremap_compute_connectivities(
+            &graph,
+            distancesp,
+            &res
+            );
+
+    // Destroy intermediate data structures
+    igraph_destroy(&graph);
+    if (dist_o != Py_None) igraph_vector_destroy(&distances);
+
+    if (return_code != IGRAPH_SUCCESS) {
+        igraph_vector_destroy(&res);
+        return NULL;
+    }
+
+    // Convert output back to Python
+    output = igraphmodule_vector_t_to_PyList(&res);
+
+    // Destroy low-level object
+    igraph_vector_destroy(&res);
+
+    return output;
+
+}
+
 
 static PyObject* treasuremapmodule_treasuremap(PyObject *self, PyObject *args, PyObject * kwds) {
 
-    static char *kwlist[] = { "nvertices", "nedges", "edges", "dist", "seed", "is_fixed", "min_dist", "epochs", "dim", "negative_sampling_rate", "a", "b", "distances_are_connectivities", NULL };
+    static char *kwlist[] = {
+        "nvertices",
+        "nedges",
+        "edges",
+        "dist",
+        "seed",
+        "is_fixed",
+        "min_dist",
+        "epochs",
+        "dim",
+        "negative_sampling_rate",
+        "a", "b",
+        "distances_are_connectivities",
+        NULL };
     long nedges, nvertices;
-    PyObject *edges_o, *dist_o, *seed_o = Py_None, *is_fixed_o;
+    PyObject *edges_o, *dist_o = Py_None, *seed_o = Py_None, *is_fixed_o = Py_None;
     double min_dist;
     long epochs, ndim, negative_sampling_rate = 5;
     int distances_are_connectivities;
     PyObject *output;
-    bool use_seed = false;
     double a = -1, b = -1;
 
     igraph_error_t return_code = 0;
-    igraph_vector_int_t igraph_edges;
-    igraph_vector_t igraph_distances;
-    igraph_vector_bool_t igraph_is_fixed;
-    igraph_t igraph_graph;
-    igraph_matrix_t igraph_res;
+    igraph_vector_int_t edges;
+    igraph_vector_t distances;
+    igraph_vector_bool_t is_fixed;
+    igraph_vector_bool_t *is_fixedp = NULL, *distancesp = NULL;
+    igraph_t graph;
+    igraph_matrix_t res;
 
     /* Parse arguments */
     if(!PyArg_ParseTupleAndKeywords(args, kwds, "llOOOOdll|lddp", kwlist,
                                     &nvertices, &nedges,
                                     &edges_o, &dist_o, &seed_o, &is_fixed_o,
-                                    &min_dist,
-                                    &epochs, &ndim, &negative_sampling_rate, &a, &b,
+                                    &min_dist, &epochs, &ndim,
+                                    &negative_sampling_rate, &a, &b,
                                     &distances_are_connectivities
                                     ))
         return NULL;
 
-    if (igraphmodule_PyObject_to_vector_bool_t(is_fixed_o, &igraph_is_fixed))
+    if ((ndim != 2) && (ndim != 3)) {
+        PyErr_SetString(PyExc_ValueError, "Number of dimensions must be 2 or 3");
         return NULL;
+    }
 
-    if (igraphmodule_PyObject_float_to_vector_t(dist_o, &igraph_distances)) {
-        igraph_vector_bool_destroy(&igraph_is_fixed);
+    if (min_dist < 0) {
+        PyErr_SetString(PyExc_ValueError, "Minimum distance must be nonnegative");
         return NULL;
+    }
+
+    if (epochs < 0) {
+        PyErr_SetString(PyExc_ValueError, "Epochs must be nonnegative");
+        return NULL;
+    }
+
+    if (negative_sampling_rate < 0) {
+        PyErr_SetString(PyExc_ValueError, "Negative sampling rate must be nonnegative");
+        return NULL;
+    }
+
+    if (is_fixed_o != Py_None) {
+        if (igraphmodule_PyObject_to_vector_bool_t(is_fixed_o, &is_fixed))
+            return NULL;
+        is_fixedp = &is_fixed;
+    }
+
+    if (dist_o != Py_None) {
+        if (igraphmodule_PyObject_float_to_vector_t(dist_o, &distances)) {
+            if (is_fixed_o != Py_None) igraph_vector_bool_destroy(&is_fixed);
+            return NULL;
+        }
+        distancesp = &distances;
     }
 
     // With a seed, inject it into the output
-    use_seed = (seed_o != Py_None);
-    if (use_seed) {
-        if (igraphmodule_PyList_to_matrix_t(seed_o, &igraph_res)) {
-            igraph_vector_bool_destroy(&igraph_is_fixed);
-            igraph_vector_destroy(&igraph_distances);
-            return NULL;
-        }
-    // Otherwise, just make a zeroes matrix, it will be randomized
-    // by the C function later on
-    } else {
-        if (igraph_matrix_init(&igraph_res, nvertices, ndim)) {
-            igraph_vector_bool_destroy(&igraph_is_fixed);
-            igraph_vector_destroy(&igraph_distances);
-            return NULL;
-        }
+    if (igraphmodule_PyList_to_matrix_t(seed_o, &res)) {
+        if (is_fixed_o != Py_None) igraph_vector_bool_destroy(&is_fixed);
+        if (dist_o != Py_None) igraph_vector_destroy(&distances);
+        return NULL;
     }
 
     // edgelist (already flattened)
-    if (igraphmodule_PyObject_to_edgelist(edges_o, &igraph_edges)) {
-        igraph_matrix_destroy(&igraph_res);
-        igraph_vector_bool_destroy(&igraph_is_fixed);
-        igraph_vector_destroy(&igraph_distances);
+    if (igraphmodule_PyObject_to_edgelist(edges_o, &edges)) {
+        igraph_matrix_destroy(&res);
+        if (is_fixed_o != Py_None) igraph_vector_bool_destroy(&is_fixed);
+        if (dist_o != Py_None) igraph_vector_destroy(&distances);
         return NULL;
     }
 
     // Initialize graph
-    if (igraph_create(&igraph_graph, &igraph_edges, nvertices, false)) {
-        igraph_matrix_destroy(&igraph_res);
-        igraph_vector_bool_destroy(&igraph_is_fixed);
-        igraph_vector_int_destroy(&igraph_edges);
-        igraph_vector_destroy(&igraph_distances);
+    if (igraph_create(&graph, &edges, nvertices, false)) {
+        igraph_vector_int_destroy(&edges);
+        igraph_matrix_destroy(&res);
+        if (is_fixed_o != Py_None) igraph_vector_bool_destroy(&is_fixed);
+        if (dist_o != Py_None) igraph_vector_destroy(&distances);
         return NULL;
     }
-    igraph_vector_int_destroy(&igraph_edges);
+    igraph_vector_int_destroy(&edges);
 
     /* Fit a and b parameter to find smooth approximation to
      * probability distribution in embedding space */
     if ((a < 0) || (b < 0)) {
         return_code = fit_ab(min_dist, &a, &b);
         if (return_code != IGRAPH_SUCCESS) {
-            igraph_destroy(&igraph_graph);
-            igraph_vector_bool_destroy(&igraph_is_fixed);
-            igraph_vector_destroy(&igraph_distances);
+            igraph_destroy(&graph);
+            if (is_fixed_o != Py_None) igraph_vector_bool_destroy(&is_fixed);
+            if (dist_o != Py_None) igraph_vector_destroy(&distances);
             return NULL;
         }
     }
 
-    // Call C fuction
+    // Compute layout
     return_code = igraph_layout_treasuremap(
-            &igraph_graph,
-            &igraph_res,
-            use_seed,
-            &igraph_distances,
+            &graph,
+            &res,
+            distancesp,
             min_dist,
             epochs,
             (int) ndim,
-            &igraph_is_fixed,
+            is_fixedp,
             a,
             b,
             negative_sampling_rate,
@@ -218,20 +326,20 @@ static PyObject* treasuremapmodule_treasuremap(PyObject *self, PyObject *args, P
             );
 
     // Destroy intermediate data structures
-    igraph_destroy(&igraph_graph);
-    igraph_vector_bool_destroy(&igraph_is_fixed);
-    igraph_vector_destroy(&igraph_distances);
+    igraph_destroy(&graph);
+    if (is_fixed_o != Py_None) igraph_vector_bool_destroy(&is_fixed);
+    if (dist_o != Py_None) igraph_vector_destroy(&distances);
 
     if (return_code != IGRAPH_SUCCESS) {
-        igraph_matrix_destroy(&igraph_res);
+        igraph_matrix_destroy(&res);
         return NULL;
     }
 
     // Convert output back to Python
-    output = igraphmodule_matrix_t_to_PyList(&igraph_res);
+    output = igraphmodule_matrix_t_to_PyList(&res);
 
     // Destroy low-level object
-    igraph_matrix_destroy(&igraph_res);
+    igraph_matrix_destroy(&res);
 
     return output;
 }
@@ -251,6 +359,7 @@ static igraph_error_t treasuremapmodule_igraph_interrupt_hook(void* data) {
 static PyMethodDef treasuremapmodule_methods[] = {
     {"layout_treasuremap", (PyCFunction) treasuremapmodule_treasuremap, METH_VARARGS | METH_KEYWORDS, "Run the C-level treasuremap function"},
     {"fit_ab", (PyCFunction) treasuremapmodule_fit_ab, METH_VARARGS | METH_KEYWORDS, "Fit a and b parameters from min_dist"},
+    {"compute_connectivities", (PyCFunction) treasuremapmodule_compute_connectivities, METH_VARARGS | METH_KEYWORDS, "Compute connectivities from distances"},
     {"compute_crossentropy", (PyCFunction) treasuremapmodule_compute_crossentropy, METH_VARARGS | METH_KEYWORDS, "Compute cross-entropy"},
     {NULL, NULL, 0, NULL}
 };

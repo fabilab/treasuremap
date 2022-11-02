@@ -31,6 +31,7 @@
 #include <math.h>
 
 //#define UMAP_DEBUG
+#define UMAP_CONNECTIVITYDEBUG
 
 #define FORCE_LIMIT 4
 #define MIN_DISTANCE_ATTRACTION 0.0001
@@ -44,7 +45,6 @@ igraph_error_t fit_ab(igraph_real_t min_dist, igraph_real_t *a_p, igraph_real_t 
 igraph_error_t igraph_layout_treasuremap(
         const igraph_t *graph,
         igraph_matrix_t *res,
-        igraph_bool_t use_seed,
         const igraph_vector_t *distances,
         igraph_real_t min_dist,
         igraph_integer_t epochs,
@@ -55,6 +55,11 @@ igraph_error_t igraph_layout_treasuremap(
         igraph_integer_t negative_sampling_rate,
         int distances_are_connectivities
         );
+
+igraph_error_t treasuremap_compute_connectivities(
+        const igraph_t *graph,
+        const igraph_vector_t *distances,
+        igraph_vector_t *connectivities);
 
 igraph_error_t igraph_umap_compute_cross_entropy(
         const igraph_t *graph,
