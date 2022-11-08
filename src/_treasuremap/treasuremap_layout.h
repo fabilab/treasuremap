@@ -27,6 +27,7 @@
 #include <igraph_random.h>
 #include <igraph_nongraph.h>
 #include <igraph_interrupt.h>
+#include <igraph_vector_list.h>
 
 #include <math.h>
 

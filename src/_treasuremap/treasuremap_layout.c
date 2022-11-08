@@ -90,11 +90,13 @@ igraph_error_t treasuremap_compute_weights(
         const igraph_vector_t *distances,
         igraph_vector_t *weights) {
 
-    igraph_integer_t no_of_nodes = igraph_vcount(graph);
+    igraph_integer_t no_of_vertices = igraph_vcount(graph);
     igraph_integer_t no_of_edges = igraph_ecount(graph);
-    igraph_integer_t no_of_neis, eid;
-    igraph_vector_int_t eids, weight_seen;
+    igraph_integer_t no_of_neis, eid, i, j, k, l;
+    igraph_vector_int_t eids;
     igraph_real_t rho, dist_max, dist, sigma, weight, weight_inv, sigma_target;
+    igraph_vector_int_list_t neighbors_seen;
+    igraph_vector_list_t weights_seen;
 
     /* Check input distances */
     if (distances != NULL) {
@@ -121,21 +123,22 @@ igraph_error_t treasuremap_compute_weights(
 
     /* if the original graph is unweighted, probabilities are 1 throughout */
     if (distances == NULL) {
-        for (igraph_integer_t j = 0; j < no_of_edges; j++) {
+        for (j = 0; j < no_of_edges; j++) {
             VECTOR(*weights)[j] = 1;
         }
         return IGRAPH_SUCCESS;
     }
-    /* alright, the graph is weighted */
+    /* alright, the graph has distances attached to edges */
 
     /* Initialize vectors and matrices */
     IGRAPH_VECTOR_INT_INIT_FINALLY(&eids, 0);
-    IGRAPH_VECTOR_INT_INIT_FINALLY(&weight_seen, no_of_edges);
+    IGRAPH_VECTOR_INT_LIST_INIT_FINALLY(&neighbors_seen, no_of_vertices);
+    IGRAPH_VECTOR_LIST_INIT_FINALLY(&weights_seen, no_of_vertices);
 
     /* Iterate over vertices x, like in the paper */
-    for (igraph_integer_t i = 0; i < no_of_nodes; i++) {
+    for (i = 0; i < no_of_vertices; i++) {
         /* Edges into this vertex */
-        IGRAPH_CHECK(igraph_incident(graph, &eids, i, IGRAPH_ALL));
+        IGRAPH_CHECK(igraph_incident(graph, &eids, i, IGRAPH_OUT));
         no_of_neis = igraph_vector_int_size(&eids);
 
         /* Vertex has no neighbors */
@@ -146,7 +149,7 @@ igraph_error_t treasuremap_compute_weights(
         /* Find rho for this vertex, i.e. the minimal non-self distance */
         rho = VECTOR(*distances)[VECTOR(eids)[0]];
         dist_max = rho;
-        for (igraph_integer_t j = 1; j < no_of_neis; j++) {
+        for (j = 1; j < no_of_neis; j++) {
             dist = VECTOR(*distances)[VECTOR(eids)[j]];
             rho = fmin(rho, dist);
             dist_max = fmax(dist_max, dist);
@@ -165,45 +168,88 @@ igraph_error_t treasuremap_compute_weights(
                         sigma_target));
         }
 
-        /* Convert to weight
-         * Each edge is seen twice, from each of its two vertices. Because this weight
-         * is a probability and the probability of the two vertices to be close are set
-         * as the probability of either "edge direction" being legit, the final weight
-         * is:
-         *
-         * P_{-> | <-} = P_{->} + P_{<-} - P_{->} * P_{<-}
-         *
-         * to avoid double counting.
-         *
-         * To implement that, we keep track of whether we have "seen" this edge before.
-         * If not, set the P_{->}. If yes, it contains P_{->} and now we can substitute
-         * it with the final result.
-         *
-         * */
-        for (igraph_integer_t j = 0; j < no_of_neis; j++) {
+        /* Convert to weight */
+        for (j = 0; j < no_of_neis; j++) {
             eid = VECTOR(eids)[j];
+
             /* Basically, nodes closer than rho have probability 1, but nothing disappears */
             weight = sigma < 0 ? 1 : exp(-(VECTOR(*distances)[eid] - rho) / sigma);
 
-            /* Compute the probability of either edge direction if you can */
-            if (VECTOR(weight_seen)[eid] != 0) {
-                weight_inv = VECTOR(*weights)[eid];
-                weight = weight + weight_inv - weight * weight_inv;
-            }
-
-#ifdef UMAP_CONNECTIVITYDEBUG
+            #ifdef UMAP_CONNECTIVITYDEBUG
             fprintf(stderr, "distance: %g\n", VECTOR(*distances)[eid]);
             fprintf(stderr, "weight: %g\n", weight);
-#endif
-            VECTOR(*weights)[eid] = weight;
-            VECTOR(weight_seen)[eid] += 1;
+            #endif
+            /* Tag the edge as seen, for symmetrization */
+            k = IGRAPH_OTHER(graph, eid, i);
+            igraph_vector_int_push_back(&(VECTOR(neighbors_seen)[i]), k);
+            igraph_vector_push_back(&(VECTOR(weights_seen)[i]), weight);
         }
 
     }
 
-    igraph_vector_int_destroy(&weight_seen);
+    /* Symmetrize the adjacency matrix without casting the whole dense thing.
+     * This takes the union of the fuzzy sets. In other words, compute the probability
+     * (weight) of this edge being real as seen by either one vertex or the other:
+     *
+     *             P_{-> | <-} = P_{->} + P_{<-} - P_{->} * P_{<-}
+     *
+     * The original implementation calls this "set operations": union, i.e. what we do
+     * here, is the default. One could also conceive doing the intersection (joint
+     * probability) or a mix of union and intersection.
+     *
+     * NOTE: Symmetrization causes a loss of information, hence we need fewer edges
+     * to represent connectivities than we have in the distance matrix which is
+     * typically not symmetric. To avoid generating another graph altogether, we
+     * encode the redundancy as a negative weight and skip that edge later on in
+     * the gradient descent. */
+    for (j=0; j < no_of_edges; j++) {
+        eid = VECTOR(eids)[j];
+        i = IGRAPH_FROM(graph, eid);
+        k = IGRAPH_TO(graph, eid);
+
+        /* Direct weight, if found */
+        weight = 0;
+        no_of_neis = igraph_vector_int_size(&(VECTOR(neighbors_seen)[i]));
+        for (l=0; l < no_of_neis; l++) {
+            if (VECTOR(VECTOR(neighbors_seen)[i])[l] == k) {
+                weight = VECTOR(VECTOR(weights_seen)[i])[l];
+                /* Tag this weight so we can ignore it later on if the opposite
+                 * directed edge is found. It's ok to retag */
+                VECTOR(VECTOR(weights_seen)[i])[l] = -1;
+                break;
+            }
+        }
+
+        if (weight < 0) {
+            VECTOR(*weights)[eid] = -1;
+            continue;
+        }
+
+        /* Weight of the opposite edge, if found */
+        weight_inv = 0;
+        no_of_neis = igraph_vector_int_size(&(VECTOR(neighbors_seen)[k]));
+        for (l=0; l < no_of_neis; l++) {
+            if (VECTOR(VECTOR(neighbors_seen)[k])[l] == i) {
+                weight_inv = VECTOR(VECTOR(weights_seen)[k])[l];
+                /* Tag this weight so we can ignore it later on if the opposite
+                 * directed edge is found. It's ok to retag */
+                VECTOR(VECTOR(weights_seen)[k])[l] = -1;
+                break;
+            }
+        }
+
+        if (weight_inv < 0) {
+            VECTOR(*weights)[eid] = -1;
+            continue;
+        }
+
+        VECTOR(*weights)[eid] = weight + weight_inv - weight * weight_inv;
+    }
+
+    igraph_vector_list_destroy(&weights_seen);
+    igraph_vector_int_list_destroy(&neighbors_seen);
     igraph_vector_int_destroy(&eids);
-    IGRAPH_FINALLY_CLEAN(2);
+    IGRAPH_FINALLY_CLEAN(3);
 
     return IGRAPH_SUCCESS;
 }
@@ -220,10 +266,10 @@ igraph_error_t igraph_umap_compute_cross_entropy(
     igraph_real_t mu, nu, xd, yd, sqd;
     igraph_integer_t from, to;
     igraph_integer_t no_of_edges = igraph_ecount(graph);
-    igraph_integer_t no_of_nodes = igraph_vcount(graph);
+    igraph_integer_t no_of_vertices = igraph_vcount(graph);
     igraph_matrix_t edge_seen;
 
-    IGRAPH_MATRIX_INIT_FINALLY(&edge_seen, no_of_nodes, no_of_nodes);
+    IGRAPH_MATRIX_INIT_FINALLY(&edge_seen, no_of_vertices, no_of_vertices);
 
     /* Measure the (variable part of the) cross-entropy terms for debugging:
      * 1. - sum_edge_e mu(e) * log(nu(e))
@@ -235,6 +281,9 @@ igraph_error_t igraph_umap_compute_cross_entropy(
     *cross_entropy = 0;
     for (igraph_integer_t eid = 0; eid < no_of_edges; eid++) {
         mu = VECTOR(*weights)[eid];
+        if (mu < 0) {
+            continue;
+        }
 
         /* Find vertices */
         from = IGRAPH_FROM(graph, eid);
@@ -266,7 +315,7 @@ igraph_error_t igraph_umap_compute_cross_entropy(
         MATRIX(edge_seen, from, to) = MATRIX(edge_seen, to, from) = 1;
     }
     /* Add the entropy from the missing edges */
-    for (igraph_integer_t from = 0; from < no_of_nodes; from++) {
+    for (igraph_integer_t from = 0; from < no_of_vertices; from++) {
         for (igraph_integer_t to = 0; to < from; to++) {
             if (MATRIX(edge_seen, from, to) > 0) {
                 continue;
@@ -334,7 +383,7 @@ static igraph_error_t igraph_i_umap_apply_forces(
         igraph_integer_t epochs,
         igraph_vector_t *next_epoch_sample_per_edge)
 {
-    igraph_integer_t no_of_nodes = igraph_matrix_nrow(layout);
+    igraph_integer_t no_of_vertices = igraph_matrix_nrow(layout);
     igraph_integer_t ndim = igraph_matrix_ncol(layout);
     igraph_integer_t no_of_edges = igraph_ecount(graph);
     igraph_integer_t from, to, nneis;
@@ -345,7 +394,7 @@ static igraph_error_t igraph_i_umap_apply_forces(
      * not be doing UMAP.
      * */
     igraph_vector_int_t neis, negative_vertices;
-    igraph_integer_t n_negative_vertices = (no_of_nodes - 1 < negative_sampling_rate) ? (no_of_nodes - 1) : negative_sampling_rate;
+    igraph_integer_t n_negative_vertices = (no_of_vertices - 1 < negative_sampling_rate) ? (no_of_vertices - 1) : negative_sampling_rate;
 
     /* Initialize vectors */
     IGRAPH_VECTOR_INIT_FINALLY(&from_emb, ndim);
@@ -359,6 +408,11 @@ static igraph_error_t igraph_i_umap_apply_forces(
 
     /* Iterate over edges. Stronger edges are sampled more often */
     for (igraph_integer_t eid = 0; eid < no_of_edges; eid++) {
+        /* Zero or negative weights are a flag for skipping */
+        if (VECTOR(*weights)[eid] <= 0) {
+            continue;
+        }
+
         /* We sample all and only edges that are supposed to be moved at this time */
         if ((VECTOR(*next_epoch_sample_per_edge)[eid] - epoch) >= 1) {
             continue;
@@ -419,7 +473,7 @@ static igraph_error_t igraph_i_umap_apply_forces(
 
             /* Random other nodes repel the focal vertex */
             IGRAPH_CHECK(igraph_random_sample(&negative_vertices,
-                        0, no_of_nodes - 2, n_negative_vertices));
+                        0, no_of_vertices - 2, n_negative_vertices));
             for (igraph_integer_t j = 0; j < n_negative_vertices; j++) {
                 /* Get random neighbor */
                 to = VECTOR(negative_vertices)[j];

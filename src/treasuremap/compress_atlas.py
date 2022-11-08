@@ -60,20 +60,30 @@ def subsample_atlas(
         cellnames.append(cellname)
 
     if minimum_cells_per_type > 0:
-        cn_set = set(cellnames)
-        cell_type_n = atlas.obs.loc[cellnames, cell_type_column].value_counts()
-        cell_types_incomplete = cell_type_n.index[cell_type_n < minimum_cells_per_type]
-        gby = atlas.obs.groupby(cell_type_column)
-        for cell_type in cell_types_incomplete:
-            nmiss = minimum_cells_per_type - cell_type_n[cell_type]
-            cellnames_type = gby.get_group(cell_type).index
-            cellnames_free = list(set(cellnames_type) - cn_set)
-            if nmiss > len(cellnames_free):
-                cellnames_take = cellnames_free
-            else:
-                cellnames_take = np.random.choice(
-                        cellnames_free, size=nmiss, replace=True)
-            cellnames.extend(cellnames_take)
+        # Make a DataFrame with cell type info and whether it's already picked
+        picked = atlas.obs[[cell_type_column]].copy()
+        picked['picked'] = False
+        picked.loc[cellnames, 'picked'] = True
+        picked['total'] = 1
+
+        tmp = picked.groupby(cell_type_column).sum()
+        cell_type_picked = tmp['picked']
+        cell_type_total = tmp['total']
+        cell_type_missing = minimum_cells_per_type - cell_type_picked
+
+        gby = picked.groupby(['picked', cell_type_column])
+        for cell_type in cell_type_picked.index:
+            if cell_type_picked[cell_type] == cell_type_total[cell_type]:
+                continue
+            miss = cell_type_missing[cell_type]
+            if miss <= 0:
+                continue
+            group = gby.get_group((False, cell_type)).index.values
+            if miss < len(group):
+                group = np.random.choice(group, size=miss, replace=False)
+            picked.loc[group, 'picked'] = True
+
+        cellnames = picked.loc[picked['picked']].index.values
 
     subsample = atlas[cellnames]
 

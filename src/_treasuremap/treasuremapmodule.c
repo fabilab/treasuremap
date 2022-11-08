@@ -161,8 +161,10 @@ static PyObject* treasuremapmodule_compute_weights(PyObject *self, PyObject *arg
         return NULL;
     }
 
-    // Initialize graph
-    if (igraph_create(&graph, &edges, nvertices, false)) {
+    // Initialize graph: it is directed and typically asymmetric
+    // The compute_weights function will symmetrize and assign
+    // zero weight to redundant edges
+    if (igraph_create(&graph, &edges, nvertices, true)) {
         igraph_vector_destroy(&res);
         igraph_vector_int_destroy(&edges);
         if (dist_o != Py_None) igraph_vector_destroy(&distances);
@@ -170,7 +172,10 @@ static PyObject* treasuremapmodule_compute_weights(PyObject *self, PyObject *arg
     }
     igraph_vector_int_destroy(&edges);
 
-    // Compute weights
+    // Compute weights: this is to be understood as a symmetric
+    // graph in which the redundant edges (distances that were
+    // present in both direction) are now one edge with the joint
+    // weight and one edge with negative weight.
     return_code = treasuremap_compute_weights(
             &graph,
             distancesp,
@@ -226,7 +231,7 @@ static PyObject* treasuremapmodule_treasuremap(PyObject *self, PyObject *args, P
     igraph_vector_t distances, weights;
     igraph_vector_bool_t is_fixed;
     igraph_vector_bool_t *is_fixedp = NULL;
-    igraph_vector_t *distancesp = NULL;
+    igraph_vector_t *distancesp = NULL, *weightsp = NULL;
     igraph_t graph;
     igraph_matrix_t res;
 
@@ -299,19 +304,24 @@ static PyObject* treasuremapmodule_treasuremap(PyObject *self, PyObject *args, P
     }
     igraph_vector_int_destroy(&edges);
 
-    // Compute weights
-    if (igraph_vector_init(&weights, 0)) {
-        igraph_destroy(&graph);
-        if (is_fixed_o != Py_None) igraph_vector_bool_destroy(&is_fixed);
-        if (dist_o != Py_None) igraph_vector_destroy(&distances);
-        return NULL;
-    }
-    if (treasuremap_compute_weights(&graph, distancesp, &weights)) {
-        igraph_destroy(&graph);
-        if (is_fixed_o != Py_None) igraph_vector_bool_destroy(&is_fixed);
-        if (dist_o != Py_None) igraph_vector_destroy(&distances);
-        igraph_vector_destroy(&weights);
-        return NULL;
+    // Compute weights, unless distances are already weights
+    if (distances_are_weights) {
+        weightsp = distancesp;
+    } else {
+        if (igraph_vector_init(&weights, 0)) {
+            igraph_destroy(&graph);
+            if (is_fixed_o != Py_None) igraph_vector_bool_destroy(&is_fixed);
+            if (dist_o != Py_None) igraph_vector_destroy(&distances);
+            return NULL;
+        }
+        if (treasuremap_compute_weights(&graph, distancesp, &weights)) {
+            igraph_destroy(&graph);
+            if (is_fixed_o != Py_None) igraph_vector_bool_destroy(&is_fixed);
+            if (dist_o != Py_None) igraph_vector_destroy(&distances);
+            igraph_vector_destroy(&weights);
+            return NULL;
+        }
+        weightsp = &weights;
     }
 
     /* Fit a and b parameter to find smooth approximation to
@@ -322,7 +332,7 @@ static PyObject* treasuremapmodule_treasuremap(PyObject *self, PyObject *args, P
             igraph_destroy(&graph);
             if (is_fixed_o != Py_None) igraph_vector_bool_destroy(&is_fixed);
             if (dist_o != Py_None) igraph_vector_destroy(&distances);
-            igraph_vector_destroy(&weights);
+            if (!distances_are_weights) igraph_vector_destroy(&weights);
             return NULL;
         }
     }
@@ -331,7 +341,7 @@ static PyObject* treasuremapmodule_treasuremap(PyObject *self, PyObject *args, P
     return_code = igraph_layout_treasuremap(
             &graph,
             &res,
-            &weights,
+            weightsp,
             min_dist,
             epochs,
             (int) ndim,
@@ -345,7 +355,7 @@ static PyObject* treasuremapmodule_treasuremap(PyObject *self, PyObject *args, P
     igraph_destroy(&graph);
     if (is_fixed_o != Py_None) igraph_vector_bool_destroy(&is_fixed);
     if (dist_o != Py_None) igraph_vector_destroy(&distances);
-    igraph_vector_destroy(&weights);
+    if (!distances_are_weights) igraph_vector_destroy(&weights);
 
     if (return_code != IGRAPH_SUCCESS) {
         igraph_matrix_destroy(&res);

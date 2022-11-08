@@ -12,6 +12,7 @@ except ImportError:
 
 import treasuremap._treasuremap as _treasuremap
 from treasuremap.compress_atlas import subsample_atlas
+from treasuremap.knn import build_knn
 
 
 def treasuremap_adata(
@@ -44,13 +45,18 @@ def treasuremap_adata(
         if 'distances' not in adata.obsp:
             raise KeyError("AnnData object must have an obsp['distances'] matrix")
         dist_matrix = adata.obsp['distances'].tocoo()
+        # NOTE: dist_matrix is basically a directed graph, i.e. it is not symmetric
+        # Later, when it is converted into weights, it gets symmetrized. Nonetheless
+        # it is conceivable that the technical sparse matrix has duplicates that
+        # would result in parallel edges. We should get rid of them.
         dist_matrix.sum_duplicates()
     else:
         if 'connectivities' not in adata.obsp:
             raise KeyError("AnnData object must have an obsp['connectivities'] matrix")
         dist_matrix = adata.obsp['connectivities'].tocoo()
 
-    # Get edges and distances, ignoring loops
+    # Get edges and distances, ignoring loops. The edges are still basically
+    # directed, so no symmetry yet.
     edges = []
     dist = []
     for i, j, d in zip(dist_matrix.row, dist_matrix.col, dist_matrix.data):
@@ -140,6 +146,14 @@ def treasuremap_igraph(
 
     if Graph is None:
         raise ImportError("Install the package igraph to use this function")
+
+    # Make sure there are no loops or parallel edges. This requires copies so
+    # we only do it if necessary
+    if any(graph.is_loop()) or graph.has_multiple():
+        graph = graph.copy()
+        graph.es['treasuremap_dist'] = dist
+        graph = graph.simplify(loops=True, combine_edges='min')
+        dist = graph.es['treasuremap_dist']
 
     nvertices = graph.vcount()
     nedges = graph.ecount()
