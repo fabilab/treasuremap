@@ -121,15 +121,6 @@ igraph_error_t treasuremap_compute_weights(
         return IGRAPH_SUCCESS;
     }
 
-    /* if the original graph is unweighted, probabilities are 1 throughout */
-    if (distances == NULL) {
-        for (j = 0; j < no_of_edges; j++) {
-            VECTOR(*weights)[j] = 1;
-        }
-        return IGRAPH_SUCCESS;
-    }
-    /* alright, the graph has distances attached to edges */
-
     /* Initialize vectors and matrices */
     IGRAPH_VECTOR_INT_INIT_FINALLY(&eids, 0);
     IGRAPH_VECTOR_INT_LIST_INIT_FINALLY(&neighbors_seen, no_of_vertices);
@@ -147,17 +138,21 @@ igraph_error_t treasuremap_compute_weights(
         }
 
         /* Find rho for this vertex, i.e. the minimal non-self distance */
-        rho = VECTOR(*distances)[VECTOR(eids)[0]];
-        dist_max = rho;
-        for (j = 1; j < no_of_neis; j++) {
-            dist = VECTOR(*distances)[VECTOR(eids)[j]];
-            rho = fmin(rho, dist);
-            dist_max = fmax(dist_max, dist);
+        if (distances != NULL) {
+            rho = VECTOR(*distances)[VECTOR(eids)[0]];
+            dist_max = rho;
+            for (j = 1; j < no_of_neis; j++) {
+                dist = VECTOR(*distances)[VECTOR(eids)[j]];
+                rho = fmin(rho, dist);
+                dist_max = fmax(dist_max, dist);
+            }
+        } else {
+            rho = dist_max = 0;
         }
 
         /* If the maximal distance is rho, all neighbors are nearest. */
         if (dist_max == rho) {
-            /* This is a special flag for later on */
+            /* This is a special flag for later on: it means weight = 1 */
             sigma = -1;
 
         /* Else, find sigma for this vertex, from its rho plus binary search */
