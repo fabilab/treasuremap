@@ -179,6 +179,7 @@ igraph_error_t treasuremap_compute_weights(
             fprintf(stderr, "distance: %g\n", VECTOR(*distances)[eid]);
             fprintf(stderr, "weight: %g\n", weight);
             #endif
+
             /* Tag the edge as seen, for symmetrization */
             k = IGRAPH_OTHER(graph, eid, i);
             igraph_vector_int_push_back(&(VECTOR(neighbors_seen)[i]), k);
@@ -202,8 +203,7 @@ igraph_error_t treasuremap_compute_weights(
      * typically not symmetric. To avoid generating another graph altogether, we
      * encode the redundancy as a negative weight and skip that edge later on in
      * the gradient descent. */
-    for (j=0; j < no_of_edges; j++) {
-        eid = VECTOR(eids)[j];
+    for (eid=0; eid < no_of_edges; eid++) {
         i = IGRAPH_FROM(graph, eid);
         k = IGRAPH_TO(graph, eid);
 
@@ -221,7 +221,7 @@ igraph_error_t treasuremap_compute_weights(
         }
 
         if (weight < 0) {
-            VECTOR(*weights)[eid] = -1;
+            VECTOR(*weights)[eid] = 0;
             continue;
         }
 
@@ -239,7 +239,7 @@ igraph_error_t treasuremap_compute_weights(
         }
 
         if (weight_inv < 0) {
-            VECTOR(*weights)[eid] = -1;
+            VECTOR(*weights)[eid] = 0;
             continue;
         }
 
