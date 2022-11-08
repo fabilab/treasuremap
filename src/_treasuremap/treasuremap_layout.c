@@ -177,6 +177,10 @@ igraph_error_t treasuremap_compute_weights(
 
             /* Tag the edge as seen, for symmetrization */
             k = IGRAPH_OTHER(graph, eid, i);
+            if (k == i) {
+                IGRAPH_ERROR("Input graph must contain no loops.", IGRAPH_EINVAL);
+            }
+
             igraph_vector_int_push_back(&(VECTOR(neighbors_seen)[i]), k);
             igraph_vector_push_back(&(VECTOR(weights_seen)[i]), weight);
         }
