@@ -13,6 +13,8 @@ except ImportError:
 import treasuremap._treasuremap as _treasuremap
 from treasuremap.compress_atlas import subsample_atlas
 from treasuremap.knn import build_knn
+from treasuremap.weights import compute_weights
+from treasuremap.subspace import compute_gene_groups, project_onto_subspace
 
 
 def treasuremap_adata(
