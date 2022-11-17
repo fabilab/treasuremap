@@ -9,53 +9,39 @@ import numpy as np
 import pandas as pd
 
 
-def compute_gene_groups(adata, cell_subtype_column, cell_type_column=None):
+def compute_gene_groups(adata, cell_type_columns):
     '''Compute gene groups for dimensionality reduction using cell type info
 
     Args:
         adata: AnnData object to find gene groups for. This is typically a
           compressed cell atlas. You are not expected to call this function on
           a full dense scRNA-Seq data set.
-        cell_subtype_column: A string with the name of the adata.obs column
-          containing the cell subtype information.
-        cell_type_column: An optional string with the name of the adata.obs
-          column containing the cell type information. This level of cell
-          typing is supposed to be a hierarchical parent of the
-          cell_subtype_column argument. Typical cell types at this level are
-          "endothelial", "epithelial", "mesenchymal", "neuron", and "immune".
-          If None, only subtype information will be used, at the cost of lower
-          accuracy of the dimensionality reduction.
+        cell_type_columns: A column name or list of column names that are in
+          adata.obs, to be used to compute gene groups. These are typically
+          the columns containing the cell type and subtype annotations, e.g.
+          cell_type_columns=['celltype', 'cellsubtype'].
 
     Returns: A dict with cell types/subtypes as keys and lists of genes as
       values. This object can be plugged into treasuremap.project_onto_subspace
       directly.
     '''
-    df = adata.obs[[cell_subtype_column]].copy()
+    if isinstance(cell_type_columns, str):
+        cell_type_columns = [cell_type_columns]
+    df = adata.obs[cell_type_columns].copy()
     df['idx'] = np.arange(len(df))
-    if cell_type_column is not None:
-        df[cell_type_column] = adata.obs[cell_type_column]
 
     # Fractions of cells expressing
     fractions = []
 
-    # Fraction expressing in cell subtype
-    fr_exps = {}
-    for ct, idxs in df.groupby(cell_subtype_column):
-        idxs = idxs['idx'].values
-        fr = (adata.X[idxs] != 0).mean(axis=0)
-        fr_exps[ct] = np.asarray(fr)[0]
-    fr_exps = pd.DataFrame(fr_exps, index=adata.var_names)
-    fractions.append(fr_exps)
-
-    # Fraction expressing in cell type
-    if cell_type_column is not None:
-        fr_par = {}
-        for ct, idxs in df.groupby('parent'):
+    # Fraction expressing in each column (e.g. within a cell type)
+    for column in cell_type_columns:
+        fr_exps = {}
+        for ct, idxs in df.groupby(column):
             idxs = idxs['idx'].values
             fr = (adata.X[idxs] != 0).mean(axis=0)
-            fr_par[ct] = np.asarray(fr)[0]
-        fr_par = pd.DataFrame(fr_par, index=adata.var_names)
-        fractions.append(fr_par)
+            fr_exps[ct] = np.asarray(fr)[0]
+        fr_exps = pd.DataFrame(fr_exps, index=adata.var_names)
+        fractions.append(fr_exps)
 
     # Find markers for each cell subtype/type, and add them up until a certain
     # KS statistic. This might change in the future, hence kssum is not public
@@ -73,13 +59,19 @@ def compute_gene_groups(adata, cell_subtype_column, cell_type_column=None):
             tmp = diff.min(axis=1).nlargest(200).cumsum()
             tmp = tmp[:(tmp >= kssum).values.nonzero()[0][0] + 1]
             if len(tmp) == 0:
-                raise ValueError(f"No markers found for cell type {ct}")
+                raise ValueError(f"No markers found for {ct}")
             gene_groups[ct] = tmp.index.tolist()
 
     return gene_groups
 
 
-def project_onto_subspace(adata, gene_groups, group_order=None, inplace=True):
+def project_onto_subspace(
+        adata,
+        gene_groups,
+        group_order=None,
+        inplace=True,
+        normalize_by_row=False,
+        ):
     '''Compute subspace from gene groups
 
     Args:
@@ -96,7 +88,7 @@ def project_onto_subspace(adata, gene_groups, group_order=None, inplace=True):
           adata.unsw['subspace'] the cell type names and gene groups. If
           False, a dictionary with those things is returned.
     '''
-          
+
 
     x = adata.X.tocsc()
     is_log = x.max() < 50
@@ -129,6 +121,9 @@ def project_onto_subspace(adata, gene_groups, group_order=None, inplace=True):
 
         scorei = np.asarray(xi.sum(axis=1))[:, 0]
         mat[:, i] = scorei
+
+    if normalize_by_row:
+        mat /= (mat.sum(axis=1) + 1e-3)
 
     if inplace:
         adata.obsm['X_subspace'] = mat
